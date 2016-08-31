@@ -38,13 +38,12 @@ static int hash_function(u8 *mac, u32 vid)
 static int find_hash_key(int index, pi_mac_entry_t * entry, struct hlist_head * head)
 {
 	pi_mac_entry_t *assist;    
-	struct hlist_node *tmp;
+	struct hlist_node *tmp, *n;
 
- 	
 	if (head[index].first == NULL) {
 		return 0;
 	} else {
-		hlist_for_each(tmp, &head[index]) {
+		hlist_for_each_safe(tmp, n, &head[index]) {
 			assist = hlist_entry(tmp, pi_mac_entry_t, tb_hlist);
 			if ((strncmp(assist->mac,entry->mac,MAC_LEN) == 0) &&\
 					(assist->vlan_id == entry->vlan_id))	
@@ -54,6 +53,28 @@ static int find_hash_key(int index, pi_mac_entry_t * entry, struct hlist_head * 
 	}
 		
 	return 0;
+}
+
+int find_hash_key_del(int index, pi_mac_entry_t * entry, struct hlist_head * head)
+{
+	pi_mac_entry_t *assist;    
+	struct hlist_node *tmp;
+
+	if (head[index].first == NULL) {
+		return -1;
+	} else {
+		hlist_for_each(tmp, &head[index]) {
+			assist = hlist_entry(tmp, pi_mac_entry_t, tb_hlist);
+			if ((strncmp(assist->mac,entry->mac,MAC_LEN) == 0) &&\
+					(assist->vlan_id == entry->vlan_id))	
+				hlist_del(&entry->tb_hlist);				  
+				free(entry);			   
+				entry = NULL;
+			return 0;
+		}
+	}
+		
+	return -1;
 }
 
 /* 
@@ -81,6 +102,24 @@ int insert_hash_table(pi_mac_entry_t *entry, struct hlist_head *head)
 	}
 
 	return 0;
+}
+
+/* 
+ * hash 删除函数
+ * @entry: 待删除的表项
+ * @head: hash链表头
+ */
+void del_hash_entry(pi_mac_entry_t *entry, struct hlist_head *head)
+{
+	int ret;
+	u32 index;
+
+	index = hash_function(entry->mac, entry->vlan_id);
+	ret = find_hash_key_del(index, entry, head);
+	if (ret < 0) {
+		printf("del_hash_entry is error \n");
+		return ;
+	}
 }
 
 /* 接收到的消息插入到消息队列*/

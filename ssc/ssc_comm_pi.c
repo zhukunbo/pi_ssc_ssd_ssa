@@ -95,13 +95,21 @@ void ssc_del_age_time_mac(void *msg)
 /* 添加静态地址*/
 void ssc_add_static_func(void *data)
 {
+	int phy_id;
 	msg_info_t *reve_info;
 	base_static_mac_t *static_mac;
+
+	PRINT_DUG("enter ssc_add_static_func \n");
 
 	reve_info   = (msg_info_t *)data;
 	static_mac = (base_static_mac_t *)reve_info->msg;
 	
-	PRINT_DUG("enter ssc_add_static_func \n");
+	if(ss_comm_ifx_db_get_phyid(0, static_mac->port_id, &phy_id)){
+		printf("ss_comm_ifx_db_get_phyid is failed \n");
+		return;
+	}
+	static_mac->port_id = phy_id;
+
 	ssc_send_ssd_conf(SSCMW_MAC_DIST_DEF, DEFAULT_VSD_ID, 
 		SSC_MSGID_MAC_ADD_ADDR, sizeof(base_static_mac_t), (char *)static_mac);
 
@@ -138,12 +146,20 @@ void ssc_clear_vlan_func(void *data)
 void ssc_clear_inter_func(void *data)
 {
 	int port_id;
+	int phy_id;
 	msg_info_t *reve_info;	
+
+	PRINT_DUG("enter ssc_clear_inter_func \n");
 
 	reve_info   = (msg_info_t *)data;
 	port_id  = *(int *)reve_info->msg;
-	
-	PRINT_DUG("enter ssc_clear_inter_func \n");
+
+	if(ss_comm_ifx_db_get_phyid(0, port_id, &phy_id)){
+		printf("ss_comm_ifx_db_get_phyid is failed \n");
+		return;
+	}
+	port_id = phy_id;
+
 	ssc_send_ssd_conf(SSCMW_MAC_DIST_DEF, DEFAULT_VSD_ID, 
 		SSC_MSGID_CLEAR_INTER_DYN, sizeof(int), &port_id);
 	/* 更新本地数据库*/	
@@ -172,7 +188,6 @@ void ssc_modify_inter_lean_sta(void *data)
 
 	reve_info   = (msg_info_t *)data;
 	str  = reve_info->msg;
-	
 	
 	PRINT_DUG("enter ssc_modify_inter_lean_sta \n");
 	ssc_send_ssd_conf(SSCMW_MAC_DIST_DEF, DEFAULT_VSD_ID, 
@@ -218,6 +233,25 @@ void ssc_send_msg_pi(int msg_type, void *msg, int msg_len)
 /* 接受来自下层ssd的地址信息 */
 static int ssc_mac_update_recv(ss_rcv_msg_t *rcv_msg, int *ret)
 {
+	ss_info_t *msg;
+	msg_info_t *payload;
+	pi_mac_entry_t *data;
+
+	PRINT_DUG("enter ssc_mac_update_recv \n");
+	
+	msg = (ss_info_t *)rcv_msg->data;
+	payload = (msg_info_t *)msg->payload;
+    data = (pi_mac_entry_t *)payload->msg;
+
+	/* 发送数据到PI */
+	ssc_send_msg_pi(SSC_MSGID_MAC_ADDR_NOTIFY, (void *)data, sizeof(pi_mac_entry_t));
+	
+	if (data->flags) {
+		ssc_add_dyn_func(payload);
+	} else {
+		ssc_del_age_time_mac(payload);
+	}
+	
     return true;
 }
 

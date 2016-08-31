@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <rg_ss/public/ss_errno.h>
 #include <rg_ss/lib/libpub/ss_comm.h>
 #include <rg_ss/public/msgdef/switch/ss_msg_switch_mac.h>
@@ -28,18 +29,6 @@
 /* 配置消息处理函数 */
 typedef int (*ssa_mac_drv_t)(void *data);
 static ssa_mac_drv_t ssa_mac_drv[SSD_MSGID_MAC_ID_NUM];
-
-/* 更新动态地址*/
-void ssa_add_dyn_func(void *msg)
-{
-	
-}
-
-/* 删除老化表项*/
-void ssa_del_age_time_mac(void *msg)
-{
-	
-}
 
 /* 添加静态地址*/
 static void ssa_add_static_func(void *msg)
@@ -262,6 +251,37 @@ static void convert_port_to_usr(int unit, bcm_l2_addr_t *l2addr, ss_mac_notify_m
     return;   
 }
 
+static void ssa_send_to_ssd(pi_mac_entry_t *data)
+{
+	msg_info_t *nt_msg;
+    ss_info_t *ss_info;
+    uint msg_len;
+    int rv;
+
+    msg_len = sizeof(msg_info_t) + sizeof(pi_mac_entry_t);
+    ss_info = ss_info_alloc_init(msg_len);
+    if (ss_info == NULL) {
+        printf("no memory!");
+        return;
+    }
+    /* 填充消息结构和参数 */
+    ss_info->hdr.msgid = SSA_MSGID_MAC_UPDATE;
+    ss_info->hdr.msg_ver = 1;
+    ss_info->hdr.concurrent = 1;
+    ss_info->hdr.sender = MSG_ROLE_SSA;
+    ss_info->hdr.reciver = MSG_ROLE_SSD;
+    ss_info->hdr.dst_type = SS_MSG_DST_SELF_NODE;
+    nt_msg = (msg_info_t *)ss_info->payload;
+	nt_msg->len = msg_len;
+    memcpy(nt_msg->msg, data, msg_len);
+    /* 发送消息 */
+    rv = ss_msg_send(ss_info);
+    if (rv != 0) {
+        printf("ss_msg_send is failed \n");
+    }
+    /* 释放消息内容 */
+    ss_info_free(ss_info);
+}
 
 /** 
  * mac_l2_addr_clbk - 接收SDK地址通告的处理函数 
@@ -281,12 +301,11 @@ static void mac_clbk(int unit, bcm_l2_addr_t *l2addr, int insert, void *userdata
 	memcpy(tmp.mac, l2addr->mac, MAC_LEN);
 	tmp.vlan_id = l2addr->vid;
 	tmp.addr_type = MAC_FLAG_DYN;
-	
 	convert_port_to_usr(0, l2addr, &noti_mac);
-
 	tmp.port_id = noti_mac.port_id;
 
-	
+	ssa_send_to_ssd(&tmp);
+	usleep(100000);
 }
 
 static void ssa_mac_drv_func_init(void)

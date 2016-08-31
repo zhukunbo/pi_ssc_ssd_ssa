@@ -22,6 +22,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
 #include <mng/cli/cli_transtion.h>
 #include <mng/cli/cli_append_cmd.h>
 
@@ -274,6 +275,9 @@ void pi_local_set_static_addr(int type, char *data, int len)
 		cli_printf("no mem \n");
 		return;
 	}
+
+	memset(tmp, 0, sizeof(pi_mac_entry_t));
+	
 	tmp->port_id = mac_info->port_id;
 	tmp->vlan_id = mac_info->vlan_id;
 	memcpy(tmp->mac,mac_info->mac,MAC_LEN);
@@ -327,7 +331,6 @@ static void pi_recevie_msg_ssc(char *msg_text, int len)
 	pthread_mutex_unlock(&msg_mutex);
 	/* 发送信号给主线程处理数据*/
 	pthread_cond_signal(&msg_cond);
-
 }
 
 /* 向SSC下发配置信息*/
@@ -339,10 +342,48 @@ void pi_to_ssc_conf(msg_info_t *rece_msg)
 	/*3、发送数据同步结束信号*/
 }
 
+/* 添加动态地址到本地数据库*/
+static void pi_add_local_dyn(pi_mac_entry_t *data)
+{
+	pi_mac_entry_t *tmp;
+
+	tmp = (pi_mac_entry_t *)malloc(sizeof(pi_mac_entry_t));
+	if (tmp == NULL) {
+		cli_printf("no mem \n");
+		return;
+	}
+	memset(tmp, 0, sizeof(pi_mac_entry_t));
+	memcpy(tmp, data, sizeof(pi_mac_entry_t));
+
+	pthread_mutex_lock(&g_mac_local_db.mutex);
+	if (insert_hash_table(tmp, g_mac_local_db.dyn_mac_tbl_head) == 0) {
+		g_mac_local_db.static_addr_count++;
+	}
+	pthread_mutex_unlock(&g_mac_local_db.mutex);
+}
+
+/* 删除老化地址*/
+static pi_del_local_dyn(pi_mac_entry_t *data)
+{
+	del_hash_entry(data, g_mac_local_db.dyn_mac_tbl_head);	
+}
+
 /* 处理SSC上传的通告消息*/
 void pi_deal_notify_msg(msg_info_t *rece_msg)
 {
-	PRINT_DUG("pi_deal_notify_msg \n");
+    pi_mac_entry_t *data;
+    
+    PRINT_DUG("pi_deal_notify_msg \n");
+    
+    data = (pi_mac_entry_t *)rece_msg->msg;
+    
+    if (data->flags) {
+        /* 更新动态地址库 */
+		pi_add_local_dyn(data);        
+    } else {
+        /* 老化时间到，删除对应的表项 */
+		pi_del_local_dyn(data);
+    }	
 }
 
 /* 主线程处理函数*/
@@ -435,6 +476,17 @@ void pi_send_msg_ssc(int msg_type, void *msg, int msg_len)
 	free(tmp);
 }						
 
+void sig_handler(int id)
+{
+	int i;
+	
+	for (i = 0; i < MAX_CLIENT; i++) {
+		close(g_client[i].fd)
+	}
+
+	exit(-1);
+}
+
 /* 设置默认参数，下发给ssc*/
 void pi_default_args_init(void)
 {	
@@ -457,6 +509,8 @@ void pi_default_args_init(void)
 #endif
 
 	/* 注册信号，退出时关闭套接字*/
+	signal(SIGKILL, sig_handler);
+	signal(SIGTERM, sig_handler);
 
 	/* 默认开启所有的端口学习能力*/
 	for (i = 1; i <= PORT_NUM; i++) {
