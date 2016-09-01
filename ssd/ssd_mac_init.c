@@ -17,6 +17,7 @@
 #include <rg_ss/lib/libpub/ss_msg_com.h>
 #include <rg_ss/public/ss_errno.h>
 #include <rg_ss/public/msgdef/switch/ss_msg_switch_mac.h>
+#include <rg_ss/lib/libpub/ss_public.h>
 
 #include "../include/ssd_mac_init.h"
 
@@ -173,7 +174,6 @@ void ssd_clear_dyn_func(void *msg)
 	ssd_send_ssa_conf(0, SSD_MSGID_MAC_CLEAR_DYN, 0, NULL);
 
 	/* 更新本地数据库*/		
-
 }
 
 /* 删除某一vlan下的地址*/
@@ -226,14 +226,13 @@ void ssd_modify_inter_lean_sta(void *msg)
 /* 接收来自SSC 的信息*/
 static u8 ssd_mac_recv_ssc_command(ss_rcv_msg_t *rcv_msg, int *ret)
 {
-	int vsdid, msgid;
+	int msgid;
 	ss_info_t *msg;
     sscmw_mac_msg_t *payload;
 
 	/* 获取传进来的数据*/
 	msg = ss_rcv_msg_get_ss_info(rcv_msg);
 	payload = (sscmw_mac_msg_t *)msg->payload;
-	//vsdid = payload->vsdid;
     msgid = payload->msgid;
 
 	g_ssd_mac_opera.ssd_mac_func[msgid](payload->msg);

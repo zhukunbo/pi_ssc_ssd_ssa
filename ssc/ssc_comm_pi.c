@@ -29,6 +29,7 @@
 #include <rg_ss/lib/libpub/ss_comm.h>
 #include <rg_ss/public/dce/ss_dce_cn_comm.h>
 #include <at/at_srv.h>
+#include <rg_ss/lib/libpub/ss_public.h>
 
 #include "../include/ssc_comm_pi.h"
 
@@ -104,7 +105,7 @@ void ssc_add_static_func(void *data)
 	reve_info   = (msg_info_t *)data;
 	static_mac = (base_static_mac_t *)reve_info->msg;
 	
-	if(ss_comm_ifx_db_get_phyid(0, static_mac->port_id, &phy_id)){
+	if (ss_comm_ifx_db_get_phyid(0, static_mac->port_id, &phy_id)) {
 		printf("ss_comm_ifx_db_get_phyid is failed \n");
 		return;
 	}
@@ -176,14 +177,14 @@ void ssc_modify_age_time(void *data)
 	
 	PRINT_DUG("enter ssc_modify_age_time \n");
 	ssc_send_ssd_conf(SSCMW_MAC_DIST_DEF, DEFAULT_VSD_ID, 
-		SSC_MSGID_MAC_AGETIME, sizeof(int), &seconds);
+		SSC_MSGID_MAC_AGETIME,  sizeof(int),  &seconds);
 	/* 更新本地数据库*/	
 }
 
 /* 修改端口学习状态*/
 void ssc_modify_inter_lean_sta(void *data)
 {
-	char *str
+	char *str;
 	msg_info_t *reve_info;	
 
 	reve_info   = (msg_info_t *)data;
@@ -193,7 +194,6 @@ void ssc_modify_inter_lean_sta(void *data)
 	ssc_send_ssd_conf(SSCMW_MAC_DIST_DEF, DEFAULT_VSD_ID, 
 		SSC_MSGID_MAC_INTER_LEARN, strlen(str), str);
 	/* 更新本地数据库*/
-
 }
 
 /*
@@ -231,7 +231,7 @@ void ssc_send_msg_pi(int msg_type, void *msg, int msg_len)
 }
 
 /* 接受来自下层ssd的地址信息 */
-static int ssc_mac_update_recv(ss_rcv_msg_t *rcv_msg, int *ret)
+int ssc_mac_update_recv(ss_rcv_msg_t *rcv_msg, int *ret)
 {
 	ss_info_t *msg;
 	msg_info_t *payload;
@@ -241,8 +241,10 @@ static int ssc_mac_update_recv(ss_rcv_msg_t *rcv_msg, int *ret)
 	
 	msg = (ss_info_t *)rcv_msg->data;
 	payload = (msg_info_t *)msg->payload;
-    data = (pi_mac_entry_t *)payload->msg;
+    	data = (pi_mac_entry_t *)payload->msg;
 
+	/* 此处要进行端口类型的转换*/
+	
 	/* 发送数据到PI */
 	ssc_send_msg_pi(SSC_MSGID_MAC_ADDR_NOTIFY, (void *)data, sizeof(pi_mac_entry_t));
 	
@@ -256,13 +258,13 @@ static int ssc_mac_update_recv(ss_rcv_msg_t *rcv_msg, int *ret)
 }
 
 /* 接收到开始数据同步信号*/
-static int ssc_mac_recv_syn_data_begin(ss_rcv_msg_t *rcv_msg, int *ret)
+int ssc_mac_recv_syn_data_begin(ss_rcv_msg_t *rcv_msg, int *ret)
 {
 	return true;
 }
 
 /* 接收到结束数据同步信号*/
-static int ssc_mac_recv_syn_data_end(ss_rcv_msg_t *rcv_msg, int *ret)
+int ssc_mac_recv_syn_data_end(ss_rcv_msg_t *rcv_msg, int *ret)
 {
 	return true;	
 }
@@ -285,7 +287,7 @@ static void ssc_recevie_msg_pi(char *msg_text, int len)
 
 static void ssc_send_pi_fetch(void)
 {
-	ssc_send_msg_pi(SSC_MSGID_MAC_FETCH,NULL,0);
+	ssc_send_msg_pi(SSC_MSGID_MAC_FETCH, NULL, 0);
 }
 
 static void *pthread_deal_func(void *arg)
@@ -312,24 +314,22 @@ RE_CONN:
     while (1) {
         if (connect(g_sock_info.sock_fd, (struct sockaddr *)&g_sock_info.server_addr, 
                 sizeof(struct sockaddr_in)) < 0) {
-            printf("connect error \n");
+            printf("ssc connect error \n");
         } else {
         	/* 连接成功，向PI请求配置信息*/
 			ssc_send_pi_fetch();
             while (1) {
                 ret = read(g_sock_info.sock_fd, buff, BUF_SIZE);
-				if (ret < 0) {
+				if (ret <= 0) {
 					close(g_sock_info.sock_fd);
 					goto RE_CONN;
-				} else if (ret == 0) {
-					continue;
 				}		
-            
-				PRINT_DUG("read g_sock_info.sock_fd sucess \n");
+				
+				PRINT_DUG("read from pi sucess \n");
 				ssc_recevie_msg_pi(buff, BUF_SIZE);
             }       
         }
-        sleep(1);
+        sleep(2);
     }
 }
 
