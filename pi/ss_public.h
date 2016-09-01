@@ -16,10 +16,10 @@
 #define SS_TOP_MOD_OFFSET       (16)  
 #define SS_SUB_MOD_OFFSET       (8) 
 
-#define MAC_FLAG_STATIC     (1<<6)
+//#define MAC_FLAG_STATIC     (1<<6)
 #define MAC_FLAG_DYN        (0<<6)
-#define MAC_FLUSH_VID		(1<<5)
-#define MAC_FLUSH_PHYID     (1<<2)
+//#define MAC_FLUSH_VID		(1<<5)
+//#define MAC_FLUSH_PHYID     (1<<2)
 
 /*公共目录下的*/
 #define	SS_MSGID_TOP_MOD_UNDEF      (0x01 << SS_TOP_MOD_OFFSET)	

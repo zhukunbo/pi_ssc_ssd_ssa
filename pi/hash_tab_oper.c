@@ -13,7 +13,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <"../include/hash_tab_oper.h">
+#include "ss_public.h"
 
 struct msg_queue{
 	struct list_head list;
@@ -45,7 +45,7 @@ static int find_hash_key(int index, pi_mac_entry_t * entry, struct hlist_head * 
 	} else {
 		hlist_for_each_safe(tmp, n, &head[index]) {
 			assist = hlist_entry(tmp, pi_mac_entry_t, tb_hlist);
-			if ((strncmp(assist->mac,entry->mac,MAC_LEN) == 0) &&\
+			if ((strncmp((char *)assist->mac, (char *)entry->mac, MAC_LEN) == 0) &&\
 					(assist->vlan_id == entry->vlan_id))	
 				assist->port_id = entry->port_id;
 			return 1;
@@ -65,7 +65,7 @@ int find_hash_key_del(int index, pi_mac_entry_t * entry, struct hlist_head * hea
 	} else {
 		hlist_for_each(tmp, &head[index]) {
 			assist = hlist_entry(tmp, pi_mac_entry_t, tb_hlist);
-			if ((strncmp(assist->mac,entry->mac,MAC_LEN) == 0) &&\
+			if ((strncmp((char *)assist->mac, (char *)entry->mac, MAC_LEN) == 0) &&\
 					(assist->vlan_id == entry->vlan_id))	
 				hlist_del(&entry->tb_hlist);				  
 				free(entry);			   
@@ -109,7 +109,7 @@ int insert_hash_table(pi_mac_entry_t *entry, struct hlist_head *head)
  * @entry: 待删除的表项
  * @head: hash链表头
  */
-void del_hash_entry(pi_mac_entry_t *entry, struct hlist_head *head)
+int  del_hash_entry(pi_mac_entry_t *entry, struct hlist_head *head)
 {
 	int ret;
 	u32 index;
@@ -118,8 +118,10 @@ void del_hash_entry(pi_mac_entry_t *entry, struct hlist_head *head)
 	ret = find_hash_key_del(index, entry, head);
 	if (ret < 0) {
 		printf("del_hash_entry is error \n");
-		return ;
+		return ret ;
 	}
+	
+	return ret;
 }
 
 /* 接收到的消息插入到消息队列*/

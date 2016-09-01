@@ -23,9 +23,8 @@
 #include <rg_dev/dm_lib/rg_dm_spf.h> 
 #include <rg_dev/dm_lib/rg_dm.h>
 
-#include "cli_mac_command.h"
 #include "ss_public.h"
-#include "conf.h"
+#include "cli_mac_command.h"
 
 extern void pi_show_all_mac(void);
 extern void pi_show_vlan_mac(int num_vlan);

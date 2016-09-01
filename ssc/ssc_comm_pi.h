@@ -25,6 +25,9 @@ typedef struct ssc_mac_opra_class{
 
 extern void ssc_comm_init(void);
 extern void ssc_mac_opera_init(void);
+extern int ssc_mac_update_recv(ss_rcv_msg_t *rcv_msg, int *ret);
+extern int ssc_mac_recv_syn_data_begin(ss_rcv_msg_t *rcv_msg, int *ret);
+extern int ssc_mac_recv_syn_data_end(ss_rcv_msg_t *rcv_msg, int *ret);
 
 #endif    /* _SSC_COMM_PI_H_ */
 

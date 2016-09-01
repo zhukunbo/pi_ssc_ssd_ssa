@@ -1,10 +1,11 @@
+#include<unistd.h>
 #include <rg_ss/public/ss_errno.h>
 #include <rg_ss/lib/libpub/ss_comm.h>
 #include <rg_ss/lib/libpub/ssc_comm_phyid.h>
 #include <rg_ss/lib/libpub/ss_msg_notify.h>
 #include <rg_ss/lib/libpub/ss_bitmap.h>
 #include <rg_ss/lib/libpub/ss_msg_com.h>
-#include<unistd.h>
+#include <rg_ss/lib/libpub/ss_public.h>
 
 #include "../include/ssc_comm_pi.h"
 

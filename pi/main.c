@@ -15,7 +15,8 @@
 #include <mng/cli/cli_transtion.h>
 #include <mng/cli/cli_append_cmd.h>
 
-#include "../include/pi_comm_ssc.h"
+#include "ss_public.h"
+#include "pi_comm_ssc.h"
 
 static struct rg_thread_master *g_cli_master;
 

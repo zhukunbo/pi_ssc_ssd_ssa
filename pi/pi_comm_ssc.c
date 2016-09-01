@@ -26,13 +26,14 @@
 #include <mng/cli/cli_transtion.h>
 #include <mng/cli/cli_append_cmd.h>
 
-#include "../include/pi_comm_ssc.h"
-#include "../include/hash_tab_oper.h"
+#include "ss_public.h"
+#include "pi_comm_ssc.h"
+#include "hash_tab_oper.h"
 
 /* PI 本地数据库*/
 static pi_db_mac_info_t g_mac_local_db;
 static sock_info_t		g_serve_sock;
-struct sockaddr_in 		g_client_addr;
+struct sockaddr_in 	g_client_addr;
 static struct pollfd 	g_client[MAX_CLIENT];
 static LIST_HEAD(g_msg_head);
 pthread_mutex_t msg_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -305,13 +306,11 @@ static void pi_recevie_msg_ssc(char *msg_text, int len)
 	if (msg_text == NULL) {
 		return;
 	}
-
 	entry = malloc(sizeof(struct msg_queue));
 	if (entry == NULL) {
 		printf("no mem \n");
 		return;
 	}
-	
 	entry->data = malloc(len);
 	if (entry->data == NULL) {
 		free(entry);
@@ -320,7 +319,6 @@ static void pi_recevie_msg_ssc(char *msg_text, int len)
 	}
 	
 	/* 将接收到的消息拷贝到本地队列*/
-
 	memcpy(entry->data, msg_text, len);
 	
 	PRINT_DUG("pi_recevie_msg_ssc recevie data \n");
@@ -357,15 +355,19 @@ static void pi_add_local_dyn(pi_mac_entry_t *data)
 
 	pthread_mutex_lock(&g_mac_local_db.mutex);
 	if (insert_hash_table(tmp, g_mac_local_db.dyn_mac_tbl_head) == 0) {
-		g_mac_local_db.static_addr_count++;
+		g_mac_local_db.dyn_addr_count++;
 	}
 	pthread_mutex_unlock(&g_mac_local_db.mutex);
 }
 
 /* 删除老化地址*/
-static pi_del_local_dyn(pi_mac_entry_t *data)
+static void pi_del_local_dyn(pi_mac_entry_t *data)
 {
-	del_hash_entry(data, g_mac_local_db.dyn_mac_tbl_head);	
+	pthread_mutex_lock(&g_mac_local_db.mutex);
+	if (del_hash_entry(data, g_mac_local_db.dyn_mac_tbl_head)  == 0){
+		g_mac_local_db.dyn_addr_count--;
+	}
+	pthread_mutex_unlock(&g_mac_local_db.mutex);
 }
 
 /* 处理SSC上传的通告消息*/
@@ -395,7 +397,7 @@ void *deal_info_func(void *arg)
 		pthread_mutex_lock(&msg_mutex);
 		while  (g_data  ==  0)  {
 			/* 没有数据时一直阻塞*/
-			pthread_cond_wait(&msg_cond,&msg_mutex);	
+			pthread_cond_wait(&msg_cond, &msg_mutex);	
 		} 
 		/* 获取队列中的数据处理*/
 		while  (!list_empty(&g_msg_head)) {
@@ -424,8 +426,7 @@ void *deal_info_func(void *arg)
 			}else {
 				PRINT_DUG("rece_msg is null \n");
 			}
-		}
-		
+		}		
 		g_data = 0;
 		pthread_mutex_unlock(&msg_mutex);
 	}
@@ -476,12 +477,15 @@ void pi_send_msg_ssc(int msg_type, void *msg, int msg_len)
 	free(tmp);
 }						
 
-void sig_handler(int id)
+static void sig_handler(int id)
 {
 	int i;
 	
 	for (i = 0; i < MAX_CLIENT; i++) {
-		close(g_client[i].fd)
+		if (g_client[i].fd < 0) {
+			continue;
+		}
+		close(g_client[i].fd);
 	}
 
 	exit(-1);
@@ -551,10 +555,10 @@ void *cli_comm_ssc_init(void *arg)
     g_serve_sock.server_addr.sin_port = htons(SERVER_PORT); 
     
     /* 绑定本地IP 和 端口号 */
-	bind(g_serve_sock.sock_fd,(struct sockaddr *)&g_serve_sock.server_addr,
-        sizeof(struct sockaddr_in));
+	bind(g_serve_sock.sock_fd, (struct sockaddr *)&g_serve_sock.server_addr,
+		sizeof(struct sockaddr_in));
         
-	listen(g_serve_sock.sock_fd,20);
+	listen(g_serve_sock.sock_fd, MAX_CLIENT);
 	 
 	 /* 将服务器ID加入监听 */
 	 g_client[0].fd = g_serve_sock.sock_fd;
@@ -567,7 +571,7 @@ void *cli_comm_ssc_init(void *arg)
 	 
 	 while (1) {
 		 /* 如果没有套接字发生变化，就一直阻塞 */
-		 n_ready = poll(g_client, maxi+1 ,INFTIM);
+		 n_ready = poll(g_client, maxi+1 , INFTIM);
 		 if (n_ready < 0 ) {
 			 printf("poll is failed \n");
 		 }
@@ -575,7 +579,8 @@ void *cli_comm_ssc_init(void *arg)
 		 len = sizeof(struct sockaddr_in);
 		 /* 监听套接字发生变化 */
 		 if (g_client[0].revents & POLLIN ) {
-			 tmp = accept(g_serve_sock.sock_fd, (struct sockaddr *)&g_client_addr, &len);
+			 tmp = accept(g_serve_sock.sock_fd, (struct sockaddr *)&g_client_addr,
+                        (socklen_t*)&len);
 			 if (tmp < 0) {
 				 printf("accept is failed \n");
 				 continue;
@@ -600,17 +605,19 @@ void *cli_comm_ssc_init(void *arg)
 		 }
 		 
 		 for (i = 1; i <= maxi; i++) {
-			 if (g_client[i].fd < 0)
-				 continue;
+			 if (g_client[i].fd < 0) {
+				continue;
+			 }
 			 
 			 if (g_client[i].revents & POLLIN) {
 				 /* 客户端发送消息过来 */
 				 n = read(g_client[i].fd, buff, BUF_SIZE);
 				 if (n <= 0) {
 					 /* 当做客户端已经退出 */
-					 printf("read error \n");
+					 printf("pi read error \n");
 					 close(g_client[i].fd);
 					 g_client[i].fd = -1;
+					 break;
 				 }
 				  /* 对读到的数据进行处理*/
 				 pi_recevie_msg_ssc(buff,BUF_SIZE);
