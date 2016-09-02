@@ -42,7 +42,7 @@ EOLWOS(exec_show_rookie_mac_static_eol, exec_show_rookie_mac_static_cmd)
 /* ÉùÃ÷vlan num½áÊø·û */
 EOLWOS(exec_show_rookie_mac_vlan_num_eol, exec_show_rookie_mac_vlan_num_cmd)
 
-NUMBER(exec_show_rookie_mac_vlan_num, exec_show_rookie_mac_vlan_num_eol, no_alt,
+NUMBER(exec_show_rookie_mac_vlan_num, exec_show_rookie_mac_vlan_num_eol, exec_show_rookie_mac_vlan_num_eol,
     "vlan num", CDBVAR(int, NUM_1), NUM_1, NUM_4094);
 /* Æ¥Åä¹Ø¼ü×Ö"vlan" */
 KEYWORD(exec_show_rookie_mac_vlan,exec_show_rookie_mac_vlan_num,exec_show_rookie_mac_table_eol,

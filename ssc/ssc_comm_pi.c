@@ -21,6 +21,7 @@
 #include <arpa/inet.h>
 #include <rg_ss/lib/libpub/ss_msg_top_alloc.h>
 #include <rg_ss/public/msgdef/switch/ss_msg_switch_mac.h>
+#include <rg_ss/lib/libpub/ssc_comm_phyid.h>
 #include <rg_ss/lib/libpub/ss_msg_util.h>
 #include <rg_ss/lib/libpub/ss_msg_com.h>
 #include <rg_ss/public/ss_errno.h>
@@ -40,34 +41,29 @@ static sock_info_t g_sock_info;
 /* 向ssd 下发配置信息*/
 static void ssc_send_ssd_conf(int node, int vsdid, int msgid, int msg_len, void *msg)
 {
-	sscmw_mac_msg_t *payload;
+	msg_info_t *tmp;
     ss_info_t *ss_info;
     int rv;
 
-    ss_info = ss_info_alloc_init(sizeof(sscmw_mac_msg_t) + msg_len);
+    ss_info = ss_info_alloc_init(sizeof(msg_info_t) + msg_len);
     if (ss_info == NULL) {
         printf("no mem \n");
         return;
     }
     /* 填充消息结构和参数 */
-    ss_info->hdr.msgid = SSC_MSGID_MAC_COMM; 
-    ss_info->hdr.msg_ver = 1;
+    ss_info->hdr.msgid      = SSC_MSGID_MAC_COMM; 
+    ss_info->hdr.msg_ver    = 1;
     ss_info->hdr.concurrent = 1;
-    ss_info->hdr.sender = MSG_ROLE_SSC;
-    ss_info->hdr.reciver = MSG_ROLE_SSD;
-    if (node == SSCMW_MAC_DIST_DEF) {
-        ss_info->hdr.dst_type = SS_MSG_DST_ALL_DIST_NODE;
-    } else {
-        ss_info->hdr.dst_type = SS_MSG_DST_SPEC_DIST_NODE;
-        ss_info->hdr.dst_dm_node = node;
-    }
-    payload = (sscmw_mac_msg_t *)ss_info->payload;
-    payload->vsdid = vsdid;
-    payload->msgid = msgid;
-    payload->msg_len = msg_len;
+    ss_info->hdr.sender     = MSG_ROLE_SSC;
+    ss_info->hdr.reciver    = MSG_ROLE_SSD;
+    ss_info->hdr.dst_type   = SS_MSG_DST_ALL_DIST_NODE;
+
+    tmp = (msg_info_t *)ss_info->payload;
+    tmp->msg_type = msgid;
+    tmp->msg_len = msg_len + sizeof(msg_info_t);
 	
 	if (msg_len > 0) {
-		memcpy(payload->msg, (char *)msg, msg_len);
+		memcpy(tmp->msg, (char *)msg, msg_len);
 	} 
     
     /* 发送消息 */
@@ -96,6 +92,7 @@ void ssc_del_age_time_mac(void *msg)
 /* 添加静态地址*/
 void ssc_add_static_func(void *data)
 {
+	int i;
 	int phy_id;
 	msg_info_t *reve_info;
 	base_static_mac_t *static_mac;
@@ -104,12 +101,19 @@ void ssc_add_static_func(void *data)
 
 	reve_info   = (msg_info_t *)data;
 	static_mac = (base_static_mac_t *)reve_info->msg;
+
+	for (i = 0; i < MAC_LEN; i++) {
+		PRINT_DUG("%x.",static_mac->mac[i]);
+	}
+
+	PRINT_DUG("\n port = %d \n", static_mac->port_id);
 	
 	if (ss_comm_ifx_db_get_phyid(0, static_mac->port_id, &phy_id)) {
 		printf("ss_comm_ifx_db_get_phyid is failed \n");
 		return;
 	}
 	static_mac->port_id = phy_id;
+	PRINT_DUG("\n phy_id = %d \n", static_mac->port_id);
 
 	ssc_send_ssd_conf(SSCMW_MAC_DIST_DEF, DEFAULT_VSD_ID, 
 		SSC_MSGID_MAC_ADD_ADDR, sizeof(base_static_mac_t), (char *)static_mac);
@@ -176,8 +180,9 @@ void ssc_modify_age_time(void *data)
 	seconds  = *(int *)reve_info->msg;
 	
 	PRINT_DUG("enter ssc_modify_age_time \n");
+	PRINT_DUG("the data info is %d \n", seconds);
 	ssc_send_ssd_conf(SSCMW_MAC_DIST_DEF, DEFAULT_VSD_ID, 
-		SSC_MSGID_MAC_AGETIME,  sizeof(int),  &seconds);
+		SSC_MSGID_MAC_AGETIME, sizeof(int), (void *)&seconds);
 	/* 更新本地数据库*/	
 }
 
@@ -190,9 +195,9 @@ void ssc_modify_inter_lean_sta(void *data)
 	reve_info   = (msg_info_t *)data;
 	str  = reve_info->msg;
 	
-	PRINT_DUG("enter ssc_modify_inter_lean_sta \n");
+	PRINT_DUG("enter ssc_modify_inter_lean_sta %d %s \n",strlen(str), str);
 	ssc_send_ssd_conf(SSCMW_MAC_DIST_DEF, DEFAULT_VSD_ID, 
-		SSC_MSGID_MAC_INTER_LEARN, strlen(str), str);
+		SSC_MSGID_MAC_INTER_LEARN, strlen(str) + 1, str);
 	/* 更新本地数据库*/
 }
 
@@ -233,6 +238,7 @@ void ssc_send_msg_pi(int msg_type, void *msg, int msg_len)
 /* 接受来自下层ssd的地址信息 */
 int ssc_mac_update_recv(ss_rcv_msg_t *rcv_msg, int *ret)
 {
+	u32 ifx;
 	ss_info_t *msg;
 	msg_info_t *payload;
 	pi_mac_entry_t *data;
@@ -241,10 +247,12 @@ int ssc_mac_update_recv(ss_rcv_msg_t *rcv_msg, int *ret)
 	
 	msg = (ss_info_t *)rcv_msg->data;
 	payload = (msg_info_t *)msg->payload;
-    	data = (pi_mac_entry_t *)payload->msg;
+    data = (pi_mac_entry_t *)payload->msg;
 
 	/* 此处要进行端口类型的转换*/
-	
+	ss_comm_get_phyid_user_ifx(data->port_id, 0 ,&ifx);
+	PRINT_DUG("ifx = %x \n", ifx);
+	data->port_id = ifx;
 	/* 发送数据到PI */
 	ssc_send_msg_pi(SSC_MSGID_MAC_ADDR_NOTIFY, (void *)data, sizeof(pi_mac_entry_t));
 	
@@ -283,7 +291,6 @@ static void ssc_recevie_msg_pi(char *msg_text, int len)
 	
 	g_ssc_mac_opera.ssc_mac_func[reve_info->msg_type](msg_text);
 }
-
 
 static void ssc_send_pi_fetch(void)
 {

@@ -44,7 +44,7 @@ static int g_data;
 /* 显示指定vlan 下的mac */
 void pi_show_vlan_mac(int num_vlan)
 {
-	int i;
+	int i, j;
 	struct hlist_node *tmp;
 	pi_mac_entry_t *assist;  
 
@@ -54,8 +54,12 @@ void pi_show_vlan_mac(int num_vlan)
 			hlist_for_each(tmp, &g_mac_local_db.static_mac_tbl_head[i]) {
 				assist = hlist_entry(tmp, pi_mac_entry_t, tb_hlist);
 				if (assist->vlan_id == num_vlan) {
-					cli_printf("%d \t %s\t\t STATIC\t %d \n",assist->vlan_id,
-					assist->mac, assist->port_id);	
+					cli_printf("%d \t",assist->vlan_id);
+					for (j = 0; j < MAC_LEN; j++) {
+						cli_printf("%x.",assist->mac[j]);
+					}
+					cli_printf("\tSTATIC\t %d \n", assist->port_id); 	
+
 				}
 			}
 		}
@@ -64,8 +68,11 @@ void pi_show_vlan_mac(int num_vlan)
 			hlist_for_each(tmp, &g_mac_local_db.dyn_mac_tbl_head[i]) {
 				assist = hlist_entry(tmp, pi_mac_entry_t, tb_hlist);
 				if (assist->vlan_id == num_vlan) {
-					cli_printf("%d \t %s\t\t STATIC\t %d \n",assist->vlan_id,
-					assist->mac, assist->port_id);	
+					cli_printf("%d \t",assist->vlan_id);
+					for (j = 0; j < MAC_LEN; j++) {
+						cli_printf("%x.",assist->mac[j]);
+					}
+					cli_printf("\t\t %d \n", assist->port_id);
 				}
 			}
 		}
@@ -85,7 +92,7 @@ void pi_show_mac_count(void)
 /* 显示静态地址条目*/
 void pi_show_static_mac(void)
 {
-	int i;
+	int i, j;
 	struct hlist_node *tmp;
 	pi_mac_entry_t *assist;    
 	
@@ -96,8 +103,11 @@ void pi_show_static_mac(void)
 		if (g_mac_local_db.static_mac_tbl_head[i].first != NULL) {
 			hlist_for_each(tmp,&g_mac_local_db.static_mac_tbl_head[i]) {
 				assist = hlist_entry(tmp,pi_mac_entry_t,tb_hlist);
-				cli_printf("%d \t %s\t\t STATIC\t %d \n",assist->vlan_id,
-					assist->mac, assist->port_id);			
+				cli_printf("%d \t",assist->vlan_id);
+				for (j = 0; j < MAC_LEN; j++) {
+					cli_printf("%x.",assist->mac[j]);
+				}
+				cli_printf("\tSTATIC\t %d \n", assist->port_id);				
 			}
 		}
 	}
@@ -106,7 +116,7 @@ void pi_show_static_mac(void)
 /* 显示所有的mac 地址*/
 void pi_show_all_mac(void)
 {
-	int i;
+	int i, j;
 	struct hlist_node *tmp;
 	pi_mac_entry_t *assist;  
 	
@@ -117,16 +127,22 @@ void pi_show_all_mac(void)
 		if (g_mac_local_db.static_mac_tbl_head[i].first != NULL) {
 			hlist_for_each(tmp, &g_mac_local_db.static_mac_tbl_head[i]) {
 				assist = hlist_entry(tmp, pi_mac_entry_t, tb_hlist);
-				cli_printf("%d \t %s\t\t STATIC\t %d \n",assist->vlan_id,
-							assist->mac, assist->port_id);			
+				cli_printf("%d \t",assist->vlan_id);
+				for (j = 0; j < MAC_LEN; j++) {
+					cli_printf("%x.",assist->mac[j]);
+				}
+				cli_printf("\tSTATIC\t %d \n", assist->port_id);		
 			}
 		}
 
 		if (g_mac_local_db.dyn_mac_tbl_head[i].first != NULL) {
 			hlist_for_each(tmp, &g_mac_local_db.dyn_mac_tbl_head[i]) {
 				assist = hlist_entry(tmp, pi_mac_entry_t, tb_hlist);
-				cli_printf("%d \t %s\t\t DYNAMIC\t %d \n",assist->vlan_id,
-							assist->mac, assist->port_id);			
+				cli_printf("%d \t",assist->vlan_id);
+				for (j = 0; j < MAC_LEN; j++) {
+					cli_printf("%x.",assist->mac[j]);
+				}
+				cli_printf("\tDYN\t %d \n", assist->port_id);			
 			}
 		}
 	}
@@ -301,8 +317,6 @@ static void pi_recevie_msg_ssc(char *msg_text, int len)
 {
 	struct msg_queue *entry;
 
-	PRINT_DUG("enter pi_recevie_msg_ssc \n");
-
 	if (msg_text == NULL) {
 		return;
 	}
@@ -320,8 +334,6 @@ static void pi_recevie_msg_ssc(char *msg_text, int len)
 	
 	/* 将接收到的消息拷贝到本地队列*/
 	memcpy(entry->data, msg_text, len);
-	
-	PRINT_DUG("pi_recevie_msg_ssc recevie data \n");
 	
 	pthread_mutex_lock(&msg_mutex);
 	insert_msg_to_queue(entry, &g_msg_head);
@@ -375,7 +387,7 @@ void pi_deal_notify_msg(msg_info_t *rece_msg)
 {
     pi_mac_entry_t *data;
     
-    PRINT_DUG("pi_deal_notify_msg \n");
+    PRINT_DUG("***pi to deal with dyn addr**** \n");
     
     data = (pi_mac_entry_t *)rece_msg->msg;
     
@@ -403,7 +415,6 @@ void *deal_info_func(void *arg)
 		while  (!list_empty(&g_msg_head)) {
 			rece_msg = get_msg_data(&g_msg_head);
 			if (rece_msg) {
-				PRINT_DUG("rece_msg->msg_type = %d \n",rece_msg->msg_type);
 				switch (rece_msg->msg_type) {
 				case SSC_MSGID_MAC_FETCH:
 					pi_to_ssc_conf(rece_msg);
@@ -462,17 +473,18 @@ void pi_send_msg_ssc(int msg_type, void *msg, int msg_len)
 	
 	/* 发送给客户端*/
 	for (i = 1; i < MAX_CLIENT; i++) {
-		if (g_client[i].fd < 0) {
+		if ((g_client[i].fd < 0) || (g_client[i].fd == g_client[i-1].fd)) {
 			continue;
 		} 
+		
 		if (write(g_client[i].fd , (char *)tmp, tmp->msg_len) < 0) {
 			printf("write to ssc is failed \n");
 			break;
 		}
-		PRINT_DUG("pi_send_msg_ssc write sucess \n");
+		cli_printf("pi_send_msg_ssc write sucess %d %d \n", i,g_client[i].fd);
 	}
 	
-    PRINT_DUG("out pi_send_msg_ssc \n");
+    cli_printf("out pi_send_msg_ssc \n");
     
 	free(tmp);
 }						
@@ -585,7 +597,7 @@ void *cli_comm_ssc_init(void *arg)
 				 printf("accept is failed \n");
 				 continue;
 			 }
-			 PRINT_DUG("connect sucess \n");
+			 cli_printf("connect sucess %d \n", tmp);
 		 }
 		 
 		 for (i = 1; i < MAX_CLIENT; i++) {

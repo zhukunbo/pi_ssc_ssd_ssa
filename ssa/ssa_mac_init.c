@@ -65,7 +65,7 @@ static void esw_mac_flag_to_hw(int32_t unit, uint32_t usr_flag, uint32_t *hw_fla
 /* 添加静态地址*/
 static void ssa_add_static_func(void *msg)
 {
-    int rv;
+    int rv, i ,ret;
 	u32 vlan;
 	msg_info_t *reve_info;	
 	base_static_mac_t *data;
@@ -74,12 +74,22 @@ static void ssa_add_static_func(void *msg)
 
 	PRINT_DUG("ENTER ssa_add_static_func \n");
 
+    memset(&l2_addr, 0, sizeof(bcm_l2_addr_t));
+    memset(&port_info, 0, sizeof(port_info));
+
 	reve_info = (msg_info_t *)msg;
 	data = (base_static_mac_t *)reve_info->msg;
 
 	port_info.mac_flag  = MAC_FLAG_STATIC;
     port_info.port_id   = data->port_id;
     port_info.port_type = 0;	/* SS_MAC_PPORT_PHYID */
+
+/**********************************************/
+	for (i = 0; i < MAC_LEN; i++) {
+		PRINT_DUG("%x.",data->mac[i]);
+	}
+	PRINT_DUG("port_id = 0x%x \n", port_info.port_id);
+/**********************************************/
 
 	/* 将用户PORT 转换为芯片PORT*/
 	rv = esw_mac_port_to_hw(0, &port_info, &l2_addr.port);
@@ -88,13 +98,16 @@ static void ssa_add_static_func(void *msg)
 		return ;
 	}
 
+	PRINT_DUG("l2_addr.port = 0x%x \n", l2_addr.port);
+
+	
 	memcpy(l2_addr.mac, data->mac, MAC_LEN);  
 
 	vlan = data->vlan_id;
 	l2_addr.vid = (unsigned short)vlan;
 	esw_mac_flag_to_hw(0, MAC_FLAG_STATIC, &l2_addr.flags);
 
-	 if (BCM_GPORT_IS_TRUNK(l2_addr.port)) {
+	if (BCM_GPORT_IS_TRUNK(l2_addr.port)) {
         l2_addr.tgid = BCM_GPORT_TRUNK_GET(l2_addr.port);
         l2_addr.port = 0;
         l2_addr.flags |= BCM_L2_TRUNK_MEMBER;
@@ -104,6 +117,17 @@ static void ssa_add_static_func(void *msg)
     }
 	
 	bcm_l2_addr_add(0, &l2_addr);
+
+	/**************测试       ***************/
+	sleep(1);
+	bcm_l2_addr_t l2_addr_1;
+	ret = bcm_l2_addr_get(0, data->mac,(unsigned short)vlan,&l2_addr_1);
+	PRINT_DUG("l2_addr.port = %d \n", ret);
+	PRINT_DUG("l2_addr_1.port = 0x%x \n", l2_addr_1.port);
+	PRINT_DUG("l2_addr_1.encap_id = 0x%x \n", l2_addr_1.encap_id);
+	PRINT_DUG("l2_addr_1.modid = 0x%x \n", l2_addr_1.modid);
+	/***************************************/
+	
 }
 
 /* 清空动态地址表项*/
@@ -129,11 +153,11 @@ static void ssa_clear_vlan_func(void *msg)
 	unsigned short vid;
 	msg_info_t *reve_info;
 
-	PRINT_DUG("ENTER ssa_clear_vlan_func \n");
 	reve_info = (msg_info_t *)msg;
-	vlan = *(int *)reve_info->msg;
-	
+	vlan = *(int *)reve_info->msg;	
 	vid = (unsigned short)vlan;
+
+	PRINT_DUG("enter ssa_clear_vlan_func %d\n", vid);
 
 	bcm_l2_addr_delete_by_vlan(0, vid, MAC_FLUSH_VID);
 }
@@ -157,12 +181,16 @@ static void ssa_clear_inter_func(void *msg)
     port_info.port_id   = port_id;
     port_info.port_type = 0;	/* SS_MAC_PPORT_PHYID */
 
+	PRINT_DUG("port_id = 0x%x \n", port_id);
+
 	/* 将用户PORT 转换为芯片PORT*/
 	rv = esw_mac_port_to_hw(0, &port_info, &port);
 	if (rv != 0) {
 		printf("error ssa_clear_inter_func \n");
 		return ;
 	}
+
+	PRINT_DUG("l2_addr.port = 0x%x \n", port);
  
     if (BCM_GPORT_IS_TRUNK(port)) {
         tid = BCM_GPORT_TRUNK_GET(port);
@@ -183,7 +211,7 @@ static void ssa_modify_age_time(void *msg)
 	msg_info_t *reve_info;
 
 	reve_info = (msg_info_t *)msg;
-	age_timer =  *(int *)reve_info->msg;
+	age_timer =  *((int *)reve_info->msg);
 
 	PRINT_DUG("enter ssa_modify_age_time %d \n", age_timer);
 	
@@ -201,19 +229,17 @@ static void ssa_modify_inter_lean_sta(void *msg)
 /* 接收来自ssd 的信息 */
 int ssa_mac_recv_ssd_comm(ss_rcv_msg_t *rcv_msg, int *ret)
 {
-	int unit, msgid;
+	int msgid;
 	ss_info_t *msg;
-    ssdmw_mac_conf_msg_t *payload;
+	msg_info_t *tmp;
+	
+	msg = (ss_info_t *)rcv_msg->data;
+    tmp = (msg_info_t *)msg->payload;
+	msgid = tmp->msg_type;
 
-	PRINT_DUG(" enter ssa_mac_recv_ssd_comm \n");
+	PRINT_DUG("ssa recv from ssd msgid = %d \n", msgid);
 
-	msg = ss_rcv_msg_get_ss_info(rcv_msg);
-    payload = (ssdmw_mac_conf_msg_t *)msg->payload;
-
-	unit = payload->unit;
-	msgid = payload->msgid;
-
-	ssa_mac_drv[msgid](payload->msg); 
+	ssa_mac_drv[msgid](tmp); 
     
     return true;
 }
@@ -309,7 +335,7 @@ static void ssa_send_to_ssd(pi_mac_entry_t *data)
     ss_info->hdr.dst_type = SS_MSG_DST_SELF_NODE;
     nt_msg = (msg_info_t *)ss_info->payload;
 	nt_msg->msg_len = msg_len;
-    memcpy(nt_msg->msg, data, msg_len);
+    memcpy(nt_msg->msg, data, sizeof(pi_mac_entry_t));
     /* 发送消息 */
     rv = ss_msg_send(ss_info);
     if (rv != 0) {
@@ -329,6 +355,7 @@ static void ssa_send_to_ssd(pi_mac_entry_t *data)
  */
 static void mac_clbk(int unit, bcm_l2_addr_t *l2addr, int insert, void *userdata)
 {
+	int i;
 	ss_mac_notify_msg_t noti_mac;
 	pi_mac_entry_t tmp;
 
@@ -342,18 +369,28 @@ static void mac_clbk(int unit, bcm_l2_addr_t *l2addr, int insert, void *userdata
 	convert_port_to_usr(0, l2addr, &noti_mac);
 	tmp.port_id = noti_mac.port_id;
 
+	/*****************************************/
+	PRINT_DUG("tmp.vlan_id = %d \n",tmp.vlan_id);
+	PRINT_DUG("tmp.flags = %d \n",tmp.flags);
+	for (i = 0; i < MAC_LEN; i++) {
+		PRINT_DUG("%x.",tmp.mac[i]);
+	}
+	PRINT_DUG("\n");
+	PRINT_DUG("tmp.port_id = %x \n", tmp.port_id);
+	/*****************************************/
+
 	ssa_send_to_ssd(&tmp);
 	usleep(100000);
 }
 
 static void ssa_mac_drv_func_init(void)
 {
+	ssa_mac_drv[SSD_MSGID_MAC_ADD_ADDR]    = ssa_add_static_func;
 	ssa_mac_drv[SSD_MSGID_MAC_CLEAR_DYN]   = ssa_clear_dyn_func;
 	ssa_mac_drv[SSD_MSGID_CLEAR_VLAN_MAC]  = ssa_clear_vlan_func;
 	ssa_mac_drv[SSD_MSGID_CLEAR_INTER_DYN] = ssa_clear_inter_func;
-	ssa_mac_drv[SSD_MSGID_MAC_AGETIME]     = ssa_modify_age_time;
-	ssa_mac_drv[SSD_MSGID_MAC_ADD_ADDR]    = ssa_add_static_func;
 	ssa_mac_drv[SSD_MSGID_MAC_INTER_LEARN] = ssa_modify_inter_lean_sta;
+	ssa_mac_drv[SSD_MSGID_MAC_AGETIME]     = ssa_modify_age_time;
 }
 
 /* ssa相关操作函数初始化*/
@@ -365,7 +402,7 @@ void ssa_opera_mac_init(void)
 	/* 注册接受来自SSD的信息*/
 	(void)ss_msg_register_handler(SSD_MSGID_MAC_COMM, ssa_mac_recv_ssd_comm);
 
-	/* 注册回调函数*/
+	/* 注册回调函数,加锁要*/
     rv = bcm_l2_addr_register(0, mac_clbk, NULL);
     if (rv < 0) {
         printf("bcm_l2_addr_register is failed \n");

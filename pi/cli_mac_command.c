@@ -147,8 +147,8 @@ void cfg_rookie_mac_learn_cmd(struct_command_data_block *pcdb)
 
     PRINT_DUG("enter cfg_rookie_mac_learn_cmd %s\n", buff);
     
-	pi_send_msg_ssc(PI_MSGID_MAC_INTER_LEARN, buff,sizeof(buff));
-	pi_update_local_db(PI_MSGID_MAC_INTER_LEARN, buff,sizeof(buff));
+	pi_send_msg_ssc(PI_MSGID_MAC_INTER_LEARN, buff, strlen(buff) + 1);
+	pi_update_local_db(PI_MSGID_MAC_INTER_LEARN, buff, strlen(buff) + 1);
 }
 
 /* 配置老化时间 */
@@ -180,10 +180,10 @@ void cfg_rookie_mac_table_static__cmd(struct_command_data_block *pcdb)
 	tmp.port_id = GETCDBVAR(int, 3);
 	
     for (i = 0; i < 6 ; i++) {
-        PRINT_DUG("0x%x,",tmp.mac[i]);
+        cli_printf("0x%x,",tmp.mac[i]);
     }
     
-    PRINT_DUG("enter cfg_rookie_mac_table_static__cmd %d %d \n",tmp.vlan_id, tmp.port_id);	
+    cli_printf("vlan = %d,port = %d \n",tmp.vlan_id, tmp.port_id);	
     
 	pi_send_msg_ssc(PI_MSGID_MAC_ADD_ADDR, (void *)&tmp, sizeof(base_static_mac_t));
 	pi_update_local_db(PI_MSGID_MAC_ADD_ADDR, (void *)&tmp, sizeof(base_static_mac_t));

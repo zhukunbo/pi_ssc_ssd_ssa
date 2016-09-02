@@ -58,19 +58,20 @@ static int find_hash_key(int index, pi_mac_entry_t * entry, struct hlist_head * 
 int find_hash_key_del(int index, pi_mac_entry_t * entry, struct hlist_head * head)
 {
 	pi_mac_entry_t *assist;    
-	struct hlist_node *tmp;
+	struct hlist_node *tmp, *n;
 
 	if (head[index].first == NULL) {
 		return -1;
 	} else {
-		hlist_for_each(tmp, &head[index]) {
+		hlist_for_each_safe(tmp, n, &head[index]) {
 			assist = hlist_entry(tmp, pi_mac_entry_t, tb_hlist);
-			if ((strncmp((char *)assist->mac, (char *)entry->mac, MAC_LEN) == 0) &&\
-					(assist->vlan_id == entry->vlan_id))	
-				hlist_del(&entry->tb_hlist);				  
-				free(entry);			   
-				entry = NULL;
-			return 0;
+			if ((strncmp((char *)assist->mac, (char *)entry->mac, MAC_LEN) == 0) &&
+					(assist->vlan_id == entry->vlan_id) && (assist->port_id == entry->port_id)){
+				hlist_del(&assist->tb_hlist);				  
+				free(assist);			   
+				assist = NULL;
+				return 0;
+			}	
 		}
 	}
 		
@@ -138,8 +139,6 @@ msg_info_t * get_msg_data(struct list_head *head)
 	
 	entry = list_entry(head->next, struct msg_queue, list);
 
-	PRINT_DUG("get_msg_data \n");
-	
 	return (msg_info_t *)entry->data;
 }
 
