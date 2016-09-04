@@ -20,7 +20,6 @@ struct msg_queue{
 	char *data;
 };
 
-/* hash 函数*/
 static int hash_function(u8 *mac, u32 vid)
 {
 	u32 hash;
@@ -34,7 +33,7 @@ static int hash_function(u8 *mac, u32 vid)
 	return (hash % HASH_SIZE);
 }
 
-/* 查找指定 的元素*/
+/* 查找hash 表中指定 的元素*/
 static int find_hash_key(int index, pi_mac_entry_t * entry, struct hlist_head * head)
 {
 	pi_mac_entry_t *assist;    
@@ -55,7 +54,7 @@ static int find_hash_key(int index, pi_mac_entry_t * entry, struct hlist_head * 
 	return 0;
 }
 
-int find_hash_key_del(int index, pi_mac_entry_t * entry, struct hlist_head * head)
+static int find_hash_key_del(int index, pi_mac_entry_t * entry, struct hlist_head * head)
 {
 	pi_mac_entry_t *assist;    
 	struct hlist_node *tmp, *n;
@@ -110,29 +109,30 @@ int insert_hash_table(pi_mac_entry_t *entry, struct hlist_head *head)
  * @entry: 待删除的表项
  * @head: hash链表头
  */
-int  del_hash_entry(pi_mac_entry_t *entry, struct hlist_head *head)
+int del_hash_entry(pi_mac_entry_t *entry, struct hlist_head *head)
 {
-	int ret;
 	u32 index;
 
 	index = hash_function(entry->mac, entry->vlan_id);
-	ret = find_hash_key_del(index, entry, head);
-	if (ret < 0) {
-		printf("del_hash_entry is error \n");
-		return ret ;
-	}
 	
-	return ret;
+	return find_hash_key_del(index, entry, head);
 }
 
-/* 接收到的消息插入到消息队列*/
+/* 
+ * 接收到的消息插入到消息队列
+ * @entry: 待删除的表项
+ * @head: 队列头
+ */
 void insert_msg_to_queue(struct msg_queue *entry, struct list_head *head)
 {
 	/* 将新节点插入链表的首部*/
 	list_add(&entry->list, head);
 }
 
-/* 获取消息队列中的数据*/
+/* 
+ * 获取消息队列中的数据
+ * @head: 队列头
+ */
 msg_info_t * get_msg_data(struct list_head *head)
 {
 	struct msg_queue *entry;
@@ -142,14 +142,17 @@ msg_info_t * get_msg_data(struct list_head *head)
 	return (msg_info_t *)entry->data;
 }
 
-/*删除已经处理的消息*/
+/* 
+ * 删除已经处理的消息
+ * @head: 队列头
+ */
 void del_dealed_msg(struct list_head *head)
 {
 	struct msg_queue *entry;
 
 	PRINT_DUG("del_dealed_msg \n");
 
-	if  (head->next)  {
+	if (head->next) {
 		entry = list_entry(head->next, struct msg_queue, list);
 		list_del(head->next);
 		if (entry->data) {

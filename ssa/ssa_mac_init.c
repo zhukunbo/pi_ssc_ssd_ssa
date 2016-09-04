@@ -1,7 +1,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
-
 #include <rg_ss/public/ss_errno.h>
 #include <rg_ss/lib/libpub/ss_comm.h>
 #include <rg_ss/lib/libpub/ssc_comm_phyid.h>
@@ -42,6 +41,7 @@
 /* 配置消息处理函数 */
 typedef void (*ssa_mac_drv_t)(void *data);
 static ssa_mac_drv_t ssa_mac_drv[SSD_MSGID_MAC_ID_NUM];
+static pthread_mutex_t send_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void esw_mac_flag_to_hw(int32_t unit, uint32_t usr_flag, uint32_t *hw_flag)
 {
@@ -221,13 +221,31 @@ static void ssa_modify_age_time(void *msg)
 /* 修改端口学习状态*/
 static void ssa_modify_inter_lean_sta(void *msg)
 {
+	int i, unit, port;
+	u32 flags;
+	inter_learn_sta_t *tmp;
+	msg_info_t *reve_info;
+	
 	PRINT_DUG("ENTER ssa_modify_inter_lean_sta \n");
 
+	reve_info = (msg_info_t *)msg;
+	tmp = (inter_learn_sta_t *)reve_info->msg;
+
+	for (i = 1; i < PORT_NUM; i++) {
+		ssa_mac_get_unit_port_from_phyid(tmp->port_id[i], &unit, &port);
+		PRINT_DUG("port = 0x%x \n", port);
+		bcm_port_learn_get(unit, port, &flags);
+		
+		flags &= ~(BCM_PORT_LEARN_ARL | BCM_PORT_LEARN_FWD | BCM_PORT_LEARN_CPU);
+    	flags |= tmp->status;    
+    	bcm_port_learn_set(unit, port, flags);
+	}
+	
 	/* 没有配置全局的命令，需要在添加端口下的命令*/
 }
 
 /* 接收来自ssd 的信息 */
-int ssa_mac_recv_ssd_comm(ss_rcv_msg_t *rcv_msg, int *ret)
+static bool ssa_mac_recv_ssd_comm(ss_rcv_msg_t *rcv_msg, int *ret)
 {
 	int msgid;
 	ss_info_t *msg;
@@ -238,7 +256,6 @@ int ssa_mac_recv_ssd_comm(ss_rcv_msg_t *rcv_msg, int *ret)
 	msgid = tmp->msg_type;
 
 	PRINT_DUG("ssa recv from ssd msgid = %d \n", msgid);
-
 	ssa_mac_drv[msgid](tmp); 
     
     return true;
@@ -359,8 +376,15 @@ static void mac_clbk(int unit, bcm_l2_addr_t *l2addr, int insert, void *userdata
 	ss_mac_notify_msg_t noti_mac;
 	pi_mac_entry_t tmp;
 
-	PRINT_DUG("enter mac_clbk \n");
+	PRINT_DUG("ssa enter mac_clbk \n");
 
+	pthread_mutex_lock(&send_mutex);
+
+	/* 静态地址，不发出通告*/
+	if (l2addr->flags & BCM_L2_STATIC) {
+		pthread_mutex_unlock(&send_mutex);
+		return;
+	}
 	memset(&tmp, 0, sizeof(pi_mac_entry_t));
 	tmp.flags = insert;		/* 添加或者老化标志*/
 	memcpy(tmp.mac, l2addr->mac, MAC_LEN);
@@ -378,8 +402,9 @@ static void mac_clbk(int unit, bcm_l2_addr_t *l2addr, int insert, void *userdata
 	PRINT_DUG("\n");
 	PRINT_DUG("tmp.port_id = %x \n", tmp.port_id);
 	/*****************************************/
-
 	ssa_send_to_ssd(&tmp);
+	pthread_mutex_unlock(&send_mutex);
+
 	usleep(100000);
 }
 

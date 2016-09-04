@@ -30,12 +30,16 @@
 #include "pi_comm_ssc.h"
 #include "hash_tab_oper.h"
 
+#define DEFAULT_NUM		0;
+
 /* PI 本地数据库*/
 static pi_db_mac_info_t g_mac_local_db;
 static sock_info_t		g_serve_sock;
 struct sockaddr_in 	g_client_addr;
 static struct pollfd 	g_client[MAX_CLIENT];
 static LIST_HEAD(g_msg_head);
+
+pthread_mutex_t send_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t msg_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t  msg_cond = PTHREAD_COND_INITIALIZER;
 /* 用来标识有无数据*/
@@ -55,11 +59,10 @@ void pi_show_vlan_mac(int num_vlan)
 				assist = hlist_entry(tmp, pi_mac_entry_t, tb_hlist);
 				if (assist->vlan_id == num_vlan) {
 					cli_printf("%d \t",assist->vlan_id);
-					for (j = 0; j < MAC_LEN; j++) {
-						cli_printf("%x.",assist->mac[j]);
+					for (j = 0; j < MAC_LEN; j += 2) {
+						cli_printf("%02x%02x.",assist->mac[j],assist->mac[j + 1]);
 					}
-					cli_printf("\tSTATIC\t %d \n", assist->port_id); 	
-
+					cli_printf("\t\tSTATIC\t GigabitEthernet 0/%d \n", assist->port_id); 	
 				}
 			}
 		}
@@ -69,15 +72,15 @@ void pi_show_vlan_mac(int num_vlan)
 				assist = hlist_entry(tmp, pi_mac_entry_t, tb_hlist);
 				if (assist->vlan_id == num_vlan) {
 					cli_printf("%d \t",assist->vlan_id);
-					for (j = 0; j < MAC_LEN; j++) {
-						cli_printf("%x.",assist->mac[j]);
+					for (j = 0; j < MAC_LEN; j += 2) {
+						cli_printf("%02x%02x.",assist->mac[j],assist->mac[j + 1]);
 					}
-					cli_printf("\t\t %d \n", assist->port_id);
+					cli_printf("\t\tDYNAMIC\t GigabitEthernet 0/%d\n", assist->port_id);
 				}
 			}
 		}
 	}
-	pthread_mutex_lock(&g_mac_local_db.mutex);
+	pthread_mutex_unlock(&g_mac_local_db.mutex);
 }
 
 /* 显示mac 地址条目个数*/
@@ -86,7 +89,7 @@ void pi_show_mac_count(void)
 	cli_printf("Dynamic Address Count  : %d\n",g_mac_local_db.dyn_addr_count);
 	cli_printf("Static  Address Count  : %d\n",g_mac_local_db.static_addr_count);
 	cli_printf("Total Mac Addresses    : %d\n",g_mac_local_db.dyn_addr_count + 
-		g_mac_local_db.static_addr_count);
+				g_mac_local_db.static_addr_count);
 }
 
 /* 显示静态地址条目*/
@@ -104,10 +107,10 @@ void pi_show_static_mac(void)
 			hlist_for_each(tmp,&g_mac_local_db.static_mac_tbl_head[i]) {
 				assist = hlist_entry(tmp,pi_mac_entry_t,tb_hlist);
 				cli_printf("%d \t",assist->vlan_id);
-				for (j = 0; j < MAC_LEN; j++) {
-					cli_printf("%x.",assist->mac[j]);
+				for (j = 0; j < MAC_LEN; j += 2) {
+					cli_printf("%02x%02x.",assist->mac[j],assist->mac[j + 1]);
 				}
-				cli_printf("\tSTATIC\t %d \n", assist->port_id);				
+				cli_printf("\t\tSTATIC\t GigabitEthernet 0/%d \n", assist->port_id); 					
 			}
 		}
 	}
@@ -128,10 +131,10 @@ void pi_show_all_mac(void)
 			hlist_for_each(tmp, &g_mac_local_db.static_mac_tbl_head[i]) {
 				assist = hlist_entry(tmp, pi_mac_entry_t, tb_hlist);
 				cli_printf("%d \t",assist->vlan_id);
-				for (j = 0; j < MAC_LEN; j++) {
-					cli_printf("%x.",assist->mac[j]);
+				for (j = 0; j < MAC_LEN; j += 2) {
+					cli_printf("%02x%02x.",assist->mac[j],assist->mac[j + 1]);
 				}
-				cli_printf("\tSTATIC\t %d \n", assist->port_id);		
+				cli_printf("\t\tSTATIC\t GigabitEthernet 0/%d \n", assist->port_id);	
 			}
 		}
 
@@ -139,10 +142,10 @@ void pi_show_all_mac(void)
 			hlist_for_each(tmp, &g_mac_local_db.dyn_mac_tbl_head[i]) {
 				assist = hlist_entry(tmp, pi_mac_entry_t, tb_hlist);
 				cli_printf("%d \t",assist->vlan_id);
-				for (j = 0; j < MAC_LEN; j++) {
-					cli_printf("%x.",assist->mac[j]);
+				for (j = 0; j < MAC_LEN; j += 2) {
+					cli_printf("%02x%02x.",assist->mac[j],assist->mac[j + 1]);
 				}
-				cli_printf("\tDYN\t %d \n", assist->port_id);			
+				cli_printf("\t\tDYNAMIC\t GigabitEthernet 0/%d\n", assist->port_id);		
 			}
 		}
 	}
@@ -254,7 +257,7 @@ static void clear_local_mac(int type, char *data, int len)
 }
 
 /* 设置端口全局学习状态*/
-void pi_local_learn_sta(int type, char *str, int len)
+static void pi_local_learn_sta(int type, char *str, int len)
 {
 	int i;
 	
@@ -271,17 +274,16 @@ void pi_local_learn_sta(int type, char *str, int len)
 }
 
 /* 设置老化时间*/
-void pi_local_set_agetime(int type, char *data, int len)
+static void pi_local_set_agetime(int type, char *data, int len)
 {
 	int age_time;
 
-	age_time = *(int *)data;
-
+	age_time = *((int *)data);
 	g_mac_local_db.age_time = age_time;
 }
 
 /* 更新本地静态地址*/
-void pi_local_set_static_addr(int type, char *data, int len)
+static void pi_local_set_static_addr(int type, char *data, int len)
 {
 	base_static_mac_t *mac_info;
 	pi_mac_entry_t *tmp;
@@ -292,7 +294,6 @@ void pi_local_set_static_addr(int type, char *data, int len)
 		cli_printf("no mem \n");
 		return;
 	}
-
 	memset(tmp, 0, sizeof(pi_mac_entry_t));
 	
 	tmp->port_id = mac_info->port_id;
@@ -300,16 +301,10 @@ void pi_local_set_static_addr(int type, char *data, int len)
 	memcpy(tmp->mac,mac_info->mac,MAC_LEN);
 
 	pthread_mutex_lock(&g_mac_local_db.mutex);
-	if (insert_hash_table(tmp,g_mac_local_db.static_mac_tbl_head) == 0) {
+	if (insert_hash_table(tmp, g_mac_local_db.static_mac_tbl_head) == 0) {
 		g_mac_local_db.static_addr_count++;
 	}
 	pthread_mutex_unlock(&g_mac_local_db.mutex);
-}
-
-/* 更新本地数据库*/
-void pi_update_local_db(int type, char *data, int len)
-{
-	g_mac_local_db.pi_local_func[type](type, data, len) ;
 }
 
 /* 接收处理来自ssc的数据*/
@@ -332,7 +327,6 @@ static void pi_recevie_msg_ssc(char *msg_text, int len)
 		return;
 	}
 	
-	/* 将接收到的消息拷贝到本地队列*/
 	memcpy(entry->data, msg_text, len);
 	
 	pthread_mutex_lock(&msg_mutex);
@@ -343,13 +337,43 @@ static void pi_recevie_msg_ssc(char *msg_text, int len)
 	pthread_cond_signal(&msg_cond);
 }
 
-/* 向SSC下发配置信息*/
-void pi_to_ssc_conf(msg_info_t *rece_msg)
+static void* pthread_ds_fun(void *arg)
 {
-	PRINT_DUG("pi_to_ssc_conf \n");
+	int i;
+	conf_info_t tmp;
+	
+	(void)pthread_detach(pthread_self());
+
+	tmp.age_time = g_mac_local_db.age_time;
+	for (i = 1; i <= PORT_NUM; i++) {
+		tmp.port_status[i] = g_mac_local_db.port_status[i];
+	}
 	/*1、发送数据同步开始信号*/
-	/*2、发送数据*/
+	pi_send_msg_ssc(PI_MSGID_DS_START, NULL, 0);
+	usleep(1000000);
+	/*2、仅向SSC 同步基本的配置信息*/
+	pi_send_msg_ssc(PI_MSGID_DS_ING, &tmp, sizeof(tmp));
+	usleep(1000000);
 	/*3、发送数据同步结束信号*/
+	pi_send_msg_ssc(PI_MSGID_DS_END, NULL, 0);
+    
+    return NULL;
+}
+
+/* 向SSC下发配置信息*/
+static void pi_to_ssc_conf(msg_info_t *rece_msg)
+{	
+	int ret;
+	pthread_t thread_id;
+
+	PRINT_DUG(" pi start to data sync \n");
+
+	/* 创建一个线程向PI 同步数据*/
+	ret = pthread_create(&thread_id, NULL, pthread_ds_fun, NULL);
+    if (ret < 0) {
+        printf("create thread failed \n");
+        return ;
+    }
 }
 
 /* 添加动态地址到本地数据库*/
@@ -383,14 +407,13 @@ static void pi_del_local_dyn(pi_mac_entry_t *data)
 }
 
 /* 处理SSC上传的通告消息*/
-void pi_deal_notify_msg(msg_info_t *rece_msg)
+static void pi_deal_notify_msg(msg_info_t *rece_msg)
 {
     pi_mac_entry_t *data;
     
     PRINT_DUG("***pi to deal with dyn addr**** \n");
     
     data = (pi_mac_entry_t *)rece_msg->msg;
-    
     if (data->flags) {
         /* 更新动态地址库 */
 		pi_add_local_dyn(data);        
@@ -398,6 +421,98 @@ void pi_deal_notify_msg(msg_info_t *rece_msg)
         /* 老化时间到，删除对应的表项 */
 		pi_del_local_dyn(data);
     }	
+}
+
+static void deal_conf_info(ssc_ds_info_t *data)
+{
+	int i;
+	conf_info_t *tmp;
+
+	tmp = (conf_info_t *)data->context;
+
+	pthread_mutex_lock(&g_mac_local_db.mutex);
+	g_mac_local_db.age_time = tmp->age_time;
+	for (i = 0; i < PORT_NUM; i++) {
+		g_mac_local_db.port_status[i] = tmp->port_status[i];
+	}
+	pthread_mutex_unlock(&g_mac_local_db.mutex);
+}
+
+static void deal_static_info(ssc_ds_info_t *data)
+{
+	pi_mac_entry_t *tmp, *entry;
+
+	tmp = (pi_mac_entry_t *)data->context;
+	entry = (pi_mac_entry_t *)malloc(sizeof(pi_mac_entry_t));
+	if (entry == NULL) {
+		cli_printf("no mem \n");
+		return;
+	}
+	memset(tmp, 0, sizeof(pi_mac_entry_t));
+	memcpy(entry, tmp, sizeof(pi_mac_entry_t));
+
+	pthread_mutex_lock(&g_mac_local_db.mutex);
+	if (insert_hash_table(entry, g_mac_local_db.static_mac_tbl_head) == 0) {
+		g_mac_local_db.static_addr_count++;
+	}
+	pthread_mutex_unlock(&g_mac_local_db.mutex);
+		
+}
+
+static void deal_dyn_info(ssc_ds_info_t *data)
+{
+	pi_mac_entry_t *entry;
+
+	entry = (pi_mac_entry_t *)data->context;
+
+	pi_add_local_dyn(entry);
+}
+
+/* 处理ssc 数据同步开始信号*/
+static void pi_deal_ds_start(void)
+{
+	PRINT_DUG("########pi_deal_ds_start##### \n");
+}
+
+/* 处理接收到的数据*/
+static void pi_deal_ds_ing(msg_info_t *rece_msg)
+{
+	ssc_ds_info_t *tmp;
+
+	PRINT_DUG("########pi_deal_ds_ing##### \n");
+
+	tmp = (ssc_ds_info_t *)rece_msg->msg;
+	switch (tmp->type) {
+	case SSC_CONF:
+		deal_conf_info(tmp);
+		break;
+	case SSC_STATIC:
+		deal_static_info(tmp);
+		break;
+	case SSC_DYN:
+		deal_dyn_info(tmp);
+		break;
+	default:
+		printf("no match type \n");
+		break;
+	}
+}
+
+/* 处理ssc 数据同步结束信号*/
+static void pi_deal_ds_end(void)
+{
+	PRINT_DUG("########pi_deal_ds_end##### \n");
+}
+
+/*
+ * 更新本地数据库
+ * @type :消息类型
+ * @data :数据 
+ * @len: 消息长度
+ */
+void pi_update_local_db(int type, char *data, int len)
+{
+	g_mac_local_db.pi_local_func[type](type, data, len) ;
 }
 
 /* 主线程处理函数*/
@@ -420,10 +535,13 @@ void *deal_info_func(void *arg)
 					pi_to_ssc_conf(rece_msg);
 					break;
 				case SSC_MSGID_MAC_UP_START:
-					/*"保留"*/
+					pi_deal_ds_start();
 					break;
+				case SSC_MSGID_MAC_UP_ING:
+					pi_deal_ds_ing(rece_msg);
+					break;	
 				case SSC_MSGID_MAC_UP_END:
-					/*"保留"*/				
+					pi_deal_ds_end();			
 					break;
 				case SSC_MSGID_MAC_ADDR_NOTIFY:
 					pi_deal_notify_msg(rece_msg);
@@ -454,8 +572,9 @@ void pi_send_msg_ssc(int msg_type, void *msg, int msg_len)
 	int i;
 	msg_info_t *tmp;
 
+	pthread_mutex_lock(&send_mutex);
     PRINT_DUG("enter pi_send_msg_ssc \n");
-    
+	
 	tmp = (msg_info_t *)malloc(sizeof(msg_info_t) + msg_len);
 	if (tmp == NULL) {
 		printf("no mem,send msg is failed \n");
@@ -476,17 +595,14 @@ void pi_send_msg_ssc(int msg_type, void *msg, int msg_len)
 		if ((g_client[i].fd < 0) || (g_client[i].fd == g_client[i-1].fd)) {
 			continue;
 		} 
-		
 		if (write(g_client[i].fd , (char *)tmp, tmp->msg_len) < 0) {
 			printf("write to ssc is failed \n");
 			break;
 		}
-		cli_printf("pi_send_msg_ssc write sucess %d %d \n", i,g_client[i].fd);
+		printf("pi_send_msg_ssc write sucess %d %d \n", i,g_client[i].fd);
 	}
-	
-    cli_printf("out pi_send_msg_ssc \n");
-    
 	free(tmp);
+	pthread_mutex_unlock(&send_mutex);
 }						
 
 static void sig_handler(int id)
@@ -499,7 +615,8 @@ static void sig_handler(int id)
 		}
 		close(g_client[i].fd);
 	}
-
+	PRINT_DUG("the process was killed \n");
+	
 	exit(-1);
 }
 
@@ -509,15 +626,15 @@ void pi_default_args_init(void)
 	int i;
 	
 	/* 默认老化时间300s */
-	g_mac_local_db.age_time = 300; 
-	g_mac_local_db.dyn_addr_count = 0;
-	g_mac_local_db.static_addr_count = 0;
-	g_mac_local_db.pi_local_func[PI_MSGID_MAC_ADD_ADDR] = pi_local_set_static_addr;
-	g_mac_local_db.pi_local_func[PI_MSGID_MAC_CLEAR_DYN] = clear_local_mac;
-	g_mac_local_db.pi_local_func[PI_MSGID_CLEAR_VLAN_MAC] = clear_local_mac;
+	g_mac_local_db.age_time          = 300; 
+	g_mac_local_db.dyn_addr_count    = DEFAULT_NUM;
+	g_mac_local_db.static_addr_count = DEFAULT_NUM;
+	g_mac_local_db.pi_local_func[PI_MSGID_MAC_ADD_ADDR]    = pi_local_set_static_addr;
+	g_mac_local_db.pi_local_func[PI_MSGID_MAC_CLEAR_DYN]   = clear_local_mac;
+	g_mac_local_db.pi_local_func[PI_MSGID_CLEAR_VLAN_MAC]  = clear_local_mac;
 	g_mac_local_db.pi_local_func[PI_MSGID_CLEAR_INTER_DYN] = clear_local_mac;
 	g_mac_local_db.pi_local_func[PI_MSGID_MAC_INTER_LEARN] = pi_local_learn_sta;
-	g_mac_local_db.pi_local_func[PI_MSGID_MAC_AGETIME] = pi_local_set_agetime;
+	g_mac_local_db.pi_local_func[PI_MSGID_MAC_AGETIME]     = pi_local_set_agetime;
 
 #if 0
 	g_mac_local_db.pi_local_func[PI_MSGID_DS_START] = ;
@@ -626,7 +743,7 @@ void *cli_comm_ssc_init(void *arg)
 				 n = read(g_client[i].fd, buff, BUF_SIZE);
 				 if (n <= 0) {
 					 /* 当做客户端已经退出 */
-					 printf("pi read error \n");
+					 printf("pi read error ret = %d \n", n);
 					 close(g_client[i].fd);
 					 g_client[i].fd = -1;
 					 break;

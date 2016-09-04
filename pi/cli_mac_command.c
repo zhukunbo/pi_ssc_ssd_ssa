@@ -45,7 +45,6 @@ APPEND_POINT(cfg_mac_commands,cfg_rookie);
 /* 显示mac表项的内容 */
 void exec_show_rookie_mac_table_cmd(struct_command_data_block *pcdb)
 {
-	PRINT_DUG("enter exec_show_rookie_mac_table_cmd \n");
 	pi_show_all_mac();
 }
 
@@ -68,32 +67,24 @@ void exec_show_rookie_mac_vlan_num_cmd(struct_command_data_block *pcdb)
 /* 显示mac条目数目 */
 void exec_show_rookie_mac_count_cmd(struct_command_data_block *pcdb)
 {
-	PRINT_DUG("enter exec_show_rookie_mac_count_cmd \n");
     pi_show_mac_count();
 }
 
 /* 显示静态路由 */
 void exec_show_rookie_mac_static_cmd(struct_command_data_block *pcdb)
 {
-
-	PRINT_DUG("enter exec_show_rookie_mac_static_cmd \n");
-
 	pi_show_static_mac();
 }
 
 /* 显示设置的老化时间 */
 void exec_show_rookie_mac_agetime_cmd(struct_command_data_block *pcdb)
 {
-	PRINT_DUG("enter exec_show_rookie_mac_agetime_cmd \n");
-
 	pi_show_mac_agetime();
 }
 
 /* 清除动态mac表项 */
 void exec_clear_rookie_mac_dynamic_cmd(struct_command_data_block *pcdb)
-{
-	PRINT_DUG("enter exec_show_rookie_mac_agetime_cmd \n");
-	
+{	
 	pi_send_msg_ssc(PI_MSGID_MAC_CLEAR_DYN, NULL,0);
 	pi_update_local_db(PI_MSGID_MAC_CLEAR_DYN,NULL,0);
 }
@@ -140,14 +131,23 @@ void exec_clear_rookie_mac_interface_num_cmd(struct_command_data_block *pcdb)
 /* 是否启动全局mac 地址学习*/
 void cfg_rookie_mac_learn_cmd(struct_command_data_block *pcdb)
 {
+	int status;
 	char buff[32];
 
 	memcpy(buff,GETCDBVAR(string, NUM_1),sizeof(buff));
 	buff[31] = '\0';
 
     PRINT_DUG("enter cfg_rookie_mac_learn_cmd %s\n", buff);
-    
-	pi_send_msg_ssc(PI_MSGID_MAC_INTER_LEARN, buff, strlen(buff) + 1);
+
+	if (strncmp(buff, "enable", strlen("enable")) == 0) {
+		status = MAC_FWD_LEARN;
+	} else if (strncmp(buff, "disable", strlen("disable")) == 0){
+		status = MAC_UNFWD_UNLEARN;
+	} else {
+		cli_printf("the args is invliad! \n");
+	}
+		
+	pi_send_msg_ssc(PI_MSGID_MAC_INTER_LEARN, (char *)&status, sizeof(int));
 	pi_update_local_db(PI_MSGID_MAC_INTER_LEARN, buff, strlen(buff) + 1);
 }
 
@@ -157,9 +157,7 @@ void cfg_rookie_mac_table_agetime_num_cmd(struct_command_data_block *pcdb)
 	int age_time;
 
 	age_time = GETCDBVAR(int, NUM_1);
-
-    PRINT_DUG("enter cfg_rookie_mac_table_agetime_num_cmd %d\n", age_time);	
-    
+ 
 	if (age_time < 0 || age_time > 600) {
 		printf("the age-time is invalid! \n");
 		return ;
