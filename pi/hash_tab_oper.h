@@ -10,3 +10,4 @@ extern void insert_msg_to_queue(struct msg_queue *entry, struct list_head *head)
 extern int del_hash_entry(pi_mac_entry_t *entry, struct hlist_head *head);
 
 #endif  /* _HASH_TAB_OPER_H_ */
+

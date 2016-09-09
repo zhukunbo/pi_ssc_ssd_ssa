@@ -1,12 +1,11 @@
 #ifndef _CLI_MAC_COMMAND_H_
 #define _CLI_MAC_COMMAND_H_
 
-#define NUM_1       1
-#define NUM_2       1
-#define NUM_4094    4094
+#define FIRST_ARG        1
+#define SECOND_ARG       2
 
 #undef  ALTERNATE
-#define ALTERNATE   no_alt
+#define ALTERNATE        no_alt
 
 /* ÏÔÊ¾mac±íÏîµÄÄÚÈÝ */
 extern void exec_show_rookie_mac_table_cmd(struct_command_data_block *pcdb);
@@ -43,25 +42,25 @@ EOLWOS(exec_show_rookie_mac_static_eol, exec_show_rookie_mac_static_cmd)
 EOLWOS(exec_show_rookie_mac_vlan_num_eol, exec_show_rookie_mac_vlan_num_cmd)
 
 NUMBER(exec_show_rookie_mac_vlan_num, exec_show_rookie_mac_vlan_num_eol, exec_show_rookie_mac_vlan_num_eol,
-    "vlan num", CDBVAR(int, NUM_1), NUM_1, NUM_4094);
+    "vlan num", CDBVAR(int, FIRST_ARG), FIRST_ARG, VLAN_MAX_SIZE);
 /* Æ¥Åä¹Ø¼ü×Ö"vlan" */
-KEYWORD(exec_show_rookie_mac_vlan, exec_show_rookie_mac_vlan_num,exec_show_rookie_mac_table_eol,
-    "vlan"," match vlan ",PRIVILEGE_USER)
+KEYWORD(exec_show_rookie_mac_vlan, exec_show_rookie_mac_vlan_num, exec_show_rookie_mac_table_eol,
+    "vlan", " match vlan ", PRIVILEGE_USER)
 /* Æ¥Åä¹Ø¼ü×Ö"static" */
-KEYWORD(exec_show_rookie_mac_static,exec_show_rookie_mac_static_eol,exec_show_rookie_mac_vlan,
-    "static"," match static ",PRIVILEGE_USER)
+KEYWORD(exec_show_rookie_mac_static, exec_show_rookie_mac_static_eol, exec_show_rookie_mac_vlan,
+    "static", " match static ", PRIVILEGE_USER)
 /* Æ¥Åä¹Ø¼ü×Ö"count" */
-KEYWORD(exec_show_rookie_mac_count,exec_show_rookie_mac_count_eol,exec_show_rookie_mac_static,
-    "count"," match count ",PRIVILEGE_USER)
+KEYWORD(exec_show_rookie_mac_count, exec_show_rookie_mac_count_eol, exec_show_rookie_mac_static,
+    "count", " match count ", PRIVILEGE_USER)
 /* Æ¥Åä¹Ø¼ü×Ö"age-time" */
-KEYWORD(exec_show_rookie_mac_agetime,exec_show_rookie_mac_agetime_eol,exec_show_rookie_mac_count,
-    "age-time"," match age-time ",PRIVILEGE_USER)
+KEYWORD(exec_show_rookie_mac_agetime, exec_show_rookie_mac_agetime_eol, exec_show_rookie_mac_count,
+    "age-time", " match age-time ", PRIVILEGE_USER)
 /* Æ¥Åä¹Ø¼ü×Ö"mac-address-table" */
-KEYWORD(exec_show_rookie_mac_table,exec_show_rookie_mac_agetime,no_alt,
-    "mac-address-table"," match mac-address-table ",PRIVILEGE_USER)
+KEYWORD(exec_show_rookie_mac_table, exec_show_rookie_mac_agetime, no_alt,
+    "mac-address-table", " match mac-address-table ", PRIVILEGE_USER)
 /* Æ¥Åä¹Ø¼ü×Ö"rookie" */
-KEYWORD(exec_show_rookie,exec_show_rookie_mac_table,ALTERNATE,
-    "rookie"," match rookie ",PRIVILEGE_USER)
+KEYWORD(exec_show_rookie, exec_show_rookie_mac_table, ALTERNATE,
+    "rookie", " match rookie ", PRIVILEGE_USER)
 
 #undef  ALTERNATE
 #define ALTERNATE   exec_show_rookie
@@ -75,27 +74,27 @@ EOLWOS(exec_clear_rookie_mac_vlan_num_eol, exec_clear_rookie_mac_vlan_num_cmd)
 EOLWOS(exec_clear_rookie_mac_interface_num_eol, exec_clear_rookie_mac_interface_num_cmd)
 
 NUMBER(exec_clear_rookie_mac_giga_num, exec_clear_rookie_mac_interface_num_eol, no_alt,
-    "interface num", CDBVAR(int, NUM_1), NUM_1, 52);
+    "interface num", CDBVAR(int, FIRST_ARG), FIRST_ARG, PORT_NUM);
 /* Æ¥Åä¹Ø¼ü×Ö"inter" */
-KEYWORD(exec_clear_rookie_mac_interface_num,exec_clear_rookie_mac_giga_num,no_alt,
-    "gigabitEthernet"," match gigabitEthernet ",PRIVILEGE_USER) 
+KEYWORD(exec_clear_rookie_mac_interface_num,exec_clear_rookie_mac_giga_num, no_alt,
+    "gigabitEthernet"," match gigabitEthernet ", PRIVILEGE_USER) 
 NUMBER(exec_clear_rookie_mac_vlan_num, exec_clear_rookie_mac_vlan_num_eol, no_alt,
-    "vlan num", CDBVAR(int, NUM_1), NUM_1, NUM_4094);
+    "vlan num", CDBVAR(int, FIRST_ARG), FIRST_ARG, VLAN_MAX_SIZE);
 /* Æ¥Åä¹Ø¼ü×Ö"interface" */
-KEYWORD(exec_clear_rookie_mac_interface,exec_clear_rookie_mac_interface_num,no_alt,
-    "interface"," match interface ",PRIVILEGE_USER)
+KEYWORD(exec_clear_rookie_mac_interface, exec_clear_rookie_mac_interface_num, no_alt,
+    "interface", " match interface ", PRIVILEGE_USER)
 /* Æ¥Åä¹Ø¼ü×Ö"vlan" */
-KEYWORD(exec_clear_rookie_mac_vlan,exec_clear_rookie_mac_vlan_num,exec_clear_rookie_mac_interface,
-    "vlan"," match vlan ",PRIVILEGE_USER)
+KEYWORD(exec_clear_rookie_mac_vlan, exec_clear_rookie_mac_vlan_num, exec_clear_rookie_mac_interface,
+    "vlan", " match vlan ", PRIVILEGE_USER)
 /* Æ¥Åä¹Ø¼ü×Ö"dynamic" */
-KEYWORD(exec_clear_rookie_mac_dynamic,exec_clear_rookie_mac_dynamic_eol,exec_clear_rookie_mac_vlan,
-    "dynamic"," match dynamic ",PRIVILEGE_USER)
+KEYWORD(exec_clear_rookie_mac_dynamic, exec_clear_rookie_mac_dynamic_eol, exec_clear_rookie_mac_vlan,
+    "dynamic", " match dynamic ", PRIVILEGE_USER)
 /* Æ¥Åä¹Ø¼ü×Ö"mac-address-table" */
-KEYWORD(exec_clear_rookie_mac,exec_clear_rookie_mac_dynamic,ALTERNATE,
-    "mac-address-table"," match mac-address-table ",PRIVILEGE_USER)
+KEYWORD(exec_clear_rookie_mac, exec_clear_rookie_mac_dynamic, ALTERNATE,
+    "mac-address-table", " match mac-address-table ", PRIVILEGE_USER)
 /* Æ¥Åä¹Ø¼ü×Ö"rookie" */
-KEYWORD(exec_clear_rookie,exec_clear_rookie_mac,ALTERNATE,
-    "rookie"," match rookie ",PRIVILEGE_USER)
+KEYWORD(exec_clear_rookie,exec_clear_rookie_mac, ALTERNATE,
+    "rookie", " match rookie ", PRIVILEGE_USER)
 
 #undef  ALTERNATE
 #define ALTERNATE   exec_clear_rookie
@@ -109,45 +108,46 @@ EOLWOS(cfg_rookie_mac_table_agetime_num_eol, cfg_rookie_mac_table_agetime_num_cm
 EOLWOS(cfg_rookie_mac_table_static_eol, cfg_rookie_mac_table_static__cmd)
 
 NUMBER(cfg_rookie_mac_table_agetime_num, cfg_rookie_mac_table_agetime_num_eol, no_alt,
-    "age-time", CDBVAR(int, NUM_1), 0, 600);
+    "age-time", CDBVAR(int, FIRST_ARG), 0, 600);
 
 /* ÊäÈëgiga num*/
 NUMBER(cfg_rookie_mac_table_static_inter_giga_num, cfg_rookie_mac_table_static_eol, no_alt,
-"giga num", CDBVAR(int, 3), NUM_1, 52);
+"giga num", CDBVAR(int, 3), FIRST_ARG, PORT_NUM);
 /* Æ¥Åä¹Ø¼ü×Ö"inter" */
-KEYWORD(cfg_rookie_mac_table_static_inter_giga,cfg_rookie_mac_table_static_inter_giga_num,no_alt,
-    "gigabitEthernet"," match gigabitEthernet ",PRIVILEGE_USER) 
+KEYWORD(cfg_rookie_mac_table_static_inter_giga, cfg_rookie_mac_table_static_inter_giga_num, no_alt,
+    "gigabitEthernet", " match gigabitEthernet ", PRIVILEGE_USER) 
 /* Æ¥Åä¹Ø¼ü×Ö"inter" */
-KEYWORD(exec_clear_rookie_mac_inter,cfg_rookie_mac_table_static_inter_giga,no_alt,
-    "interface"," match interface ",PRIVILEGE_USER) 
+KEYWORD(exec_clear_rookie_mac_inter, cfg_rookie_mac_table_static_inter_giga, no_alt,
+    "interface", " match interface ", PRIVILEGE_USER)
 /* ÊäÈëvlan num*/
 NUMBER(cfg_rookie_mac_table_static_vlan_num, exec_clear_rookie_mac_inter, no_alt,
-"vlan num", CDBVAR(int, NUM_2), NUM_1, NUM_4094);
+"vlan num", CDBVAR(int, SECOND_ARG), FIRST_ARG, VLAN_MAX_SIZE);
 /* Æ¥Åä¹Ø¼ü×Ö"vlan" */
-KEYWORD(cfg_rookie_mac_table_static_vlan,cfg_rookie_mac_table_static_vlan_num,no_alt,
-    "vlan"," match vlan ",PRIVILEGE_USER) 
+KEYWORD(cfg_rookie_mac_table_static_vlan, cfg_rookie_mac_table_static_vlan_num, no_alt,
+    "vlan", " match vlan ", PRIVILEGE_USER) 
 /* ÊäÈëMACµØÖ·*/    
 MACADDR(cfg_rookie_mac_table_static_mac, cfg_rookie_mac_table_static_vlan, no_alt,
-    "input the mac address ", CDBVAR(paddr,NUM_1))
+    "input the mac address ", CDBVAR(paddr,FIRST_ARG))
 /* Æ¥Åä¹Ø¼ü×Ö"static" */
-KEYWORD(cfg_rookie_mac_table_static,cfg_rookie_mac_table_static_mac,no_alt,
-    "static"," match static ",PRIVILEGE_USER) 
+KEYWORD(cfg_rookie_mac_table_static, cfg_rookie_mac_table_static_mac, no_alt,
+    "static", " match static ", PRIVILEGE_USER) 
 /* Æ¥Åä¹Ø¼ü×Ö"age-time" */
-KEYWORD(cfg_rookie_mac_table_agetime,cfg_rookie_mac_table_agetime_num,cfg_rookie_mac_table_static,
-    "age-time"," match age-time ",PRIVILEGE_USER)
+KEYWORD(cfg_rookie_mac_table_agetime, cfg_rookie_mac_table_agetime_num, cfg_rookie_mac_table_static,
+    "age-time", " match age-time ", PRIVILEGE_USER)
 /* Æ¥Åä¹Ø¼ü×Ö"mac-address-learing" */
-KEYWORD(cfg_rookie_mac_table,cfg_rookie_mac_table_agetime,no_alt,
-    "mac-address-table"," match mac-address-table ",PRIVILEGE_USER)
+KEYWORD(cfg_rookie_mac_table, cfg_rookie_mac_table_agetime, no_alt,
+    "mac-address-table", " match mac-address-table ", PRIVILEGE_USER)
 /*ÊäÈë×Ö·û´®*/
-TXT_LINE(cfg_rookie_mac_learn,cfg_rookie_mac_learn_eol,ALTERNATE, \
-         "get enable or disable",CDBVAR(string,NUM_1))
+TXT_LINE(cfg_rookie_mac_learn, cfg_rookie_mac_learn_eol, ALTERNATE, \
+    "get enable or disable", CDBVAR(string,FIRST_ARG))
 /* Æ¥Åä¹Ø¼ü×Ö"mac-address-learing" */
-KEYWORD(cfg_rookie_mac,cfg_rookie_mac_learn,cfg_rookie_mac_table,
-    "mac-address-learing"," match mac-address-learing ",PRIVILEGE_USER)
+KEYWORD(cfg_rookie_mac, cfg_rookie_mac_learn, cfg_rookie_mac_table,
+    "mac-address-learing", " match mac-address-learing ", PRIVILEGE_USER)
 /* Æ¥Åä¹Ø¼ü×Ö"rookie" */
-KEYWORD(cfg_rookie,cfg_rookie_mac,ALTERNATE,"rookie"," match rookie ",PRIVILEGE_USER)
+KEYWORD(cfg_rookie, cfg_rookie_mac, ALTERNATE, "rookie", " match rookie ", PRIVILEGE_USER)
 
 #undef  ALTERNATE
 #define ALTERNATE   cfg_rookie
 
 #endif  /* _CLI_MAC_COMMAND_H_ */
+

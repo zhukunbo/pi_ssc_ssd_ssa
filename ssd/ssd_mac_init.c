@@ -19,51 +19,16 @@
 #include <rg_ss/public/msgdef/switch/ss_msg_switch_mac.h>
 #include <rg_ss/lib/libpub/ss_public.h>
 
+#include "../include/ss_public.h"
 #include "../include/ssd_mac_init.h"
 
 static mac_opra_class_t g_ssd_mac_opera;
-
-/* 接受来自SSC 的数据同步开始命令*/
-static bool ssd_mac_recv_ds_begin(ss_rcv_msg_t *rcv_msg, int *ret)
-{
-	return true;	
-}
-
-/* 接受来自SSC 的数据同步结束命令 */
-static bool ssd_mac_recv_ds_end(ss_rcv_msg_t *rcv_msg, int *ret)
-{
-	return true;	
-}
-
-/* 接收SSA 开始向上同步消息 */
-static bool ssd_mac_recv_up_dyn_begin(ss_rcv_msg_t *rcv_msg, int *ret)
-{
-	return true;
-}
-
-/* 接收SSA 结束向上同步消息 */
-static bool ssd_mac_recv_up_dyn_end(ss_rcv_msg_t *rcv_msg, int *ret)
-{
-	return true;
-}
-
-/* 更新动态地址*/
-void ssd_add_dyn_func(void *msg)
-{
-	PRINT_DUG("enter ssd_add_dyn_func \n");
-}
-
-/* 删除老化表项*/
-void ssd_del_age_time_mac(void *msg)
-{
-	PRINT_DUG("enter ssd_del_age_time_mac \n");
-}
 
 static void ssd_send_msg_ssc(msg_info_t *msg_info)
 {
     ss_info_t *ss_info;
     int rv;
-
+    
     ss_info = ss_info_alloc_init(msg_info->msg_len);
     if (ss_info == NULL) {
         printf("ss_info: %p \n", ss_info);
@@ -73,13 +38,11 @@ static void ssd_send_msg_ssc(msg_info_t *msg_info)
     ss_info->hdr.msgid      = SSD_MSGID_MAC_UPDATE; 
     ss_info->hdr.msg_ver    = 1;
     ss_info->hdr.concurrent = 1;
-    ss_info->hdr.sender   	= MSG_ROLE_SSD;
-    ss_info->hdr.reciver  	= MSG_ROLE_SSC;
-    ss_info->hdr.dst_type 	= SS_MSG_DST_SELF_NODE;
-    
+    ss_info->hdr.sender     = MSG_ROLE_SSD;
+    ss_info->hdr.reciver    = MSG_ROLE_SSC;
+    ss_info->hdr.dst_type   = SS_MSG_DST_SELF_NODE;
     memcpy(ss_info->payload, (char *)msg_info, msg_info->msg_len);
-
-	/* 发送消息 */
+    /* 发送消息 */
     rv = ss_msg_send(ss_info);
     if (rv != 0) {
         printf("rv: %d", rv);
@@ -93,37 +56,25 @@ static void ssd_send_msg_ssc(msg_info_t *msg_info)
 /* 接收SSA 消息 */
 static bool ssd_mac_recv_ssa_msg(ss_rcv_msg_t *rcv_msg, int *ret)
 {
-	ss_info_t *msg;
-	msg_info_t *payload;
-	pi_mac_entry_t *data;
+    ss_info_t *msg;
+    msg_info_t *payload;
+    pi_mac_entry_t *data;
 
-	/* 获取传进来的数据 */
-	msg = (ss_info_t *)rcv_msg->data;
-	payload = (msg_info_t *)msg->payload;
+    /* 获取传进来的数据 */
+    msg = (ss_info_t *)rcv_msg->data;
+    payload = (msg_info_t *)msg->payload;
     data = (pi_mac_entry_t *)payload->msg;
+    data->port_id = ss_phyid_fe2ce(data->port_id);
+    /* 新增加动态地址，上传给ssc */
+    ssd_send_msg_ssc(payload);
 
-	data->port_id = ss_phyid_fe2ce(data->port_id); 
-
-	PRINT_DUG("data->port_id = %x \n", data->port_id);
-	
-	/* 新增加动态地址，上传给ssc */
-	ssd_send_msg_ssc(payload);
-
-	if (data->flags == 1) {
-		/* 更新本地数据库*/
-		ssd_add_dyn_func((void *)payload);
-	} else {
-		/* 地址老化*/
-		ssd_del_age_time_mac((void *)payload);
-	}
-	
-	return true;
+    return true;
 }
 
-/* ssd 下发消息给ssa */
+/* ssd下发消息给ssa */
 void ssd_send_ssa_conf(int unit, int msgid, int msg_len, void *msg)
 {
-	msg_info_t *reve_info;	
+    msg_info_t *reve_info;  
     ss_info_t *ss_info;
     int rv;
 
@@ -133,16 +84,16 @@ void ssd_send_ssa_conf(int unit, int msgid, int msg_len, void *msg)
         return;
     }
     /* 填充消息结构和参数 */
-    ss_info->hdr.msgid = SSD_MSGID_MAC_COMM; 
-    ss_info->hdr.msg_ver = 1;
-    ss_info->hdr.concurrent = 1;
-    ss_info->hdr.sender = MSG_ROLE_SSD;
-    ss_info->hdr.reciver = MSG_ROLE_SSA;
-    ss_info->hdr.dst_type = SS_MSG_DST_SELF_NODE;
+    ss_info->hdr.msgid        = SSD_MSGID_MAC_COMM;
+    ss_info->hdr.msg_ver      = 1;
+    ss_info->hdr.concurrent   = 1;
+    ss_info->hdr.sender       = MSG_ROLE_SSD;
+    ss_info->hdr.reciver      = MSG_ROLE_SSA;
+    ss_info->hdr.dst_type     = SS_MSG_DST_SELF_NODE;
     reve_info = (msg_info_t *)ss_info->payload;
     reve_info->msg_type= msgid;
     reve_info->msg_len = msg_len;
-	
+    
     if (msg_len > 0) {
         memcpy(reve_info, msg, msg_len);
     }
@@ -153,155 +104,109 @@ void ssd_send_ssa_conf(int unit, int msgid, int msg_len, void *msg)
     }
     /* 释放消息内容 */
     ss_info_free(ss_info);
-    
-    return;
 }
 
-/* 添加静态地址*/
+/* 添加静态地址 */
 void ssd_add_static_func(void *msg)
 {
-	int i;
-	msg_info_t *reve_info;	
+    msg_info_t *reve_info;
+    base_static_mac_t *static_mac;
 
-	PRINT_DUG("enter ssd_add_static_func \n");
-	reve_info = (msg_info_t *)msg;
-	/*************    *调试*********************/
-	base_static_mac_t *static_mac;
-	static_mac = (base_static_mac_t *)reve_info->msg;
-	for (i = 0; i < MAC_LEN; i++) {
-		PRINT_DUG("%x.",static_mac->mac[i]);
-	}
-
-	PRINT_DUG("\n port = %d \n", static_mac->port_id);
-
-	/*********************************************/
-
-	static_mac->port_id = ss_phyid_ce2fe(static_mac->port_id);
-	
-	ssd_send_ssa_conf(0, SSD_MSGID_CLEAR_VLAN_MAC, reve_info->msg_len, msg);
+    reve_info = (msg_info_t *)msg;
+    static_mac = (base_static_mac_t *)reve_info->msg;
+    static_mac->port_id = ss_phyid_ce2fe(static_mac->port_id);
+    ssd_send_ssa_conf(0, SSD_MSGID_CLEAR_VLAN_MAC, reve_info->msg_len, msg);
 }
 
-/* 清空动态地址表项*/
+/* 清空动态地址表项 */
 void ssd_clear_dyn_func(void *msg)
-{	
-	msg_info_t *reve_info;
-	PRINT_DUG("enter ssd_clear_dyn_func \n");
-	reve_info = (msg_info_t *)msg;
-	/* 向下传送消息给SSA */
-	ssd_send_ssa_conf(0, SSD_MSGID_MAC_CLEAR_DYN, reve_info->msg_len, msg);
+{   
+    msg_info_t *reve_info;
+    reve_info = (msg_info_t *)msg;
+    /* 向下传送消息给SSA */
+    ssd_send_ssa_conf(0, SSD_MSGID_MAC_CLEAR_DYN, reve_info->msg_len, msg);
 }
 
-/* 删除某一vlan下的地址*/
+/* 删除某一vlan下的地址 */
 void ssd_clear_vlan_func(void *msg)
 {
-	msg_info_t *reve_info;	
+    msg_info_t *reve_info;
 
-	PRINT_DUG("enter ssd_clear_vlan_func \n");
-	reve_info = (msg_info_t *)msg;
-	
-	/*************    *调试*********************/
-	PRINT_DUG("vlan = %d \n", *((int *)reve_info->msg));
-	/*********************************************/
-
-	ssd_send_ssa_conf(0, SSD_MSGID_CLEAR_VLAN_MAC, reve_info->msg_len, msg);
+    reve_info = (msg_info_t *)msg;
+    ssd_send_ssa_conf(0, SSD_MSGID_CLEAR_VLAN_MAC, reve_info->msg_len, msg);
 }
 
-/* 删除某一端口下的地址*/
+/* 删除某一端口下的地址 */
 void ssd_clear_inter_func(void *msg)
 {
-	u32 port;
-	msg_info_t *reve_info;	
+    u32 port;
+    msg_info_t *reve_info;  
 
-	PRINT_DUG("enter ssd_clear_inter_func \n");
-	reve_info = (msg_info_t *)msg;
-
-	/*************    *调试*********************/
-	port = *((int *)reve_info->msg);
-	PRINT_DUG("vlan = %d \n", *((int *)reve_info->msg));
-	/*********************************************/
-
-	port = ss_phyid_ce2fe(port);
-	*((int *)reve_info->msg) = port;
-
-	PRINT_DUG("convert vlan = %d \n", *((int *)reve_info->msg));
-	
-	ssd_send_ssa_conf(0, SSD_MSGID_CLEAR_INTER_DYN, reve_info->msg_len, msg);
-
-	/* 更新数据库*/
+    reve_info = (msg_info_t *)msg;
+    port = *((int *)reve_info->msg);
+    port = ss_phyid_ce2fe(port);
+    *((int *)reve_info->msg) = port;
+    ssd_send_ssa_conf(0, SSD_MSGID_CLEAR_INTER_DYN, reve_info->msg_len, msg);
 }
 
-/* 修改老化时间*/
+/* 修改老化时间 */
 void ssd_modify_age_time(void *msg)
 {
-	msg_info_t *reve_info;	
+    msg_info_t *reve_info;
 
-	PRINT_DUG("enter ssd_modify_age_time \n");
-	reve_info = (msg_info_t *)msg;
-
-	PRINT_DUG("the age time is %d \n", *((int *)reve_info->msg));
-	ssd_send_ssa_conf(0, SSD_MSGID_MAC_AGETIME, reve_info->msg_len, msg);
-	/* 更新数据库*/
+    reve_info = (msg_info_t *)msg;
+    ssd_send_ssa_conf(0, SSD_MSGID_MAC_AGETIME, reve_info->msg_len, msg);
 }
 
-/* 修改端口学习状态*/
+/* 修改端口学习状态 */
 void ssd_modify_inter_lean_sta(void *msg)
 {
-	int i;
-	inter_learn_sta_t *tmp;
-	msg_info_t *reve_info;	
+    int i;
+    inter_learn_sta_t *tmp;
+    msg_info_t *reve_info;
 
-	PRINT_DUG("enter ssd_modify_inter_lean_sta \n");
-
-	reve_info = (msg_info_t *)msg;
-	tmp = (inter_learn_sta_t *)reve_info->msg;
-	for (i = 1; i < PORT_NUM + 1; i++) {
-		tmp->port_id[i] = ss_phyid_ce2fe(tmp->port_id[i]);
-	}	
-	
-	ssd_send_ssa_conf(0, SSD_MSGID_MAC_INTER_LEARN, reve_info->msg_len, msg);
-	/* 更新数据库*/
+    reve_info = (msg_info_t *)msg;
+    tmp = (inter_learn_sta_t *)reve_info->msg;
+    for (i = 1; i < PORT_NUM + 1; i++) {
+        tmp->port_id[i] = ss_phyid_ce2fe(tmp->port_id[i]);
+    }   
+    ssd_send_ssa_conf(0, SSD_MSGID_MAC_INTER_LEARN, reve_info->msg_len, msg);
 }
 
 /* 接收来自SSC 的信息*/
 static bool ssd_mac_recv_ssc_command(ss_rcv_msg_t *rcv_msg, int *ret)
 {
-	int msgid;
-	ss_info_t *msg;
+    int msgid;
+    ss_info_t *msg;
     msg_info_t *tmp;
 
-	/* 获取传进来的数据*/
-	msg = (ss_info_t *)rcv_msg->data;
-	tmp = (msg_info_t *)msg->payload;
+    /* 获取传进来的数据*/
+    msg = (ss_info_t *)rcv_msg->data;
+    tmp = (msg_info_t *)msg->payload;
     msgid = tmp->msg_type;
+    g_ssd_mac_opera.ssd_mac_func[msgid](tmp);
 
-	g_ssd_mac_opera.ssd_mac_func[msgid](tmp);
-
-	return true;
+    return true;
 }
 
 /* ssd mac处理函数初始化*/
 void ssd_mac_func_init(void)
 {
-	g_ssd_mac_opera.ssd_mac_func[SSC_MSGID_MAC_ADD_ADDR] = ssd_add_static_func;
-	g_ssd_mac_opera.ssd_mac_func[SSC_MSGID_MAC_CLEAR_DYN] = ssd_clear_dyn_func;
-	g_ssd_mac_opera.ssd_mac_func[SSC_MSGID_CLEAR_VLAN_MAC] = ssd_clear_vlan_func;
-	g_ssd_mac_opera.ssd_mac_func[SSC_MSGID_CLEAR_INTER_DYN] = ssd_clear_inter_func;
-	g_ssd_mac_opera.ssd_mac_func[SSC_MSGID_MAC_INTER_LEARN] = ssd_modify_inter_lean_sta;
-	g_ssd_mac_opera.ssd_mac_func[SSC_MSGID_MAC_AGETIME] = ssd_modify_age_time;
+    g_ssd_mac_opera.ssd_mac_func[SSC_MSGID_MAC_ADD_ADDR]    = ssd_add_static_func;
+    g_ssd_mac_opera.ssd_mac_func[SSC_MSGID_MAC_CLEAR_DYN]   = ssd_clear_dyn_func;
+    g_ssd_mac_opera.ssd_mac_func[SSC_MSGID_CLEAR_VLAN_MAC]  = ssd_clear_vlan_func;
+    g_ssd_mac_opera.ssd_mac_func[SSC_MSGID_CLEAR_INTER_DYN] = ssd_clear_inter_func;
+    g_ssd_mac_opera.ssd_mac_func[SSC_MSGID_MAC_INTER_LEARN] = ssd_modify_inter_lean_sta;
+    g_ssd_mac_opera.ssd_mac_func[SSC_MSGID_MAC_AGETIME]     = ssd_modify_age_time;
 }
 
 /* ssd 相关初始化函数操作*/
 void ssd_mac_opera_init(void)
 {
-	ssd_mac_func_init();
-	/* SSC事件处理函数注册 */
-	(void)ss_msg_register_handler(SSC_MSGID_MAC_COMM, ssd_mac_recv_ssc_command);
-	(void)ss_msg_register_handler(SSC_MSGID_MAC_DATA_SYN_BEGIN, ssd_mac_recv_ds_begin);
-	(void)ss_msg_register_handler(SSC_MSGID_MAC_DATA_SYNC_END, ssd_mac_recv_ds_end);
-	
-	/* SSA事件处理函数注册 */
-	(void)ss_msg_register_handler(SSA_MSGID_MAC_UPDATE, ssd_mac_recv_ssa_msg);
-	(void)ss_msg_register_handler(SSA_MSGID_MAC_DATA_SYNC_BEGIN, ssd_mac_recv_up_dyn_begin);
-	(void)ss_msg_register_handler(SSA_MSGID_MAC_DATA_SYNC_END, ssd_mac_recv_up_dyn_end);	
+    ssd_mac_func_init();
+    /* SSC事件处理函数注册 */
+    (void)ss_msg_register_handler(SSC_MSGID_MAC_COMM, ssd_mac_recv_ssc_command);
+    /* SSA事件处理函数注册 */
+    (void)ss_msg_register_handler(SSA_MSGID_MAC_UPDATE, ssd_mac_recv_ssa_msg);
 }
 
