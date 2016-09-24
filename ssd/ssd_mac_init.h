@@ -16,3 +16,4 @@ typedef struct ssc_mac_opra_class{
 }mac_opra_class_t;
 
 #endif  /* _SSD_MAC_INIT_H */
+

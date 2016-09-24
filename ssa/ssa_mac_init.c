@@ -182,20 +182,9 @@ static void convert_port_to_usr(int unit, bcm_l2_addr_t *l2addr, ss_mac_notify_m
     noti_mac->port_type = SS_MAC_PPORT_PHYID;
     noti_mac->port_id = 0;
     phyid = &noti_mac->port_id;
-    
-    mod = port = -1;
-    if (BCM_GPORT_IS_SET(l2addr->port)) {
-        if (BCM_GPORT_IS_MODPORT(l2addr->port)) {
-            mod = BCM_GPORT_MODPORT_MODID_GET(l2addr->port);
-            port = BCM_GPORT_MODPORT_PORT_GET(l2addr->port);              
-        } 
-    } else {  
-        mod = l2addr->modid;
-        port = l2addr->port;
-    }
-    if (mod != -1 && port != -1) {
-        (void)ssa_mac_get_phyid_from_chip_port(mod, port, (int *)phyid);
-    }
+    mod = l2addr->modid;
+    port = l2addr->port;
+    (void)ssa_mac_get_phyid_from_chip_port(mod, port, (int *)phyid);
 }
 
 static void ssa_send_to_ssd(pi_mac_entry_t *data)
@@ -203,7 +192,6 @@ static void ssa_send_to_ssd(pi_mac_entry_t *data)
     msg_info_t *nt_msg;
     ss_info_t *ss_info;
     uint msg_len;
-    int rv;
 
     msg_len = sizeof(msg_info_t) + sizeof(pi_mac_entry_t);
     ss_info = ss_info_alloc_init(msg_len);
@@ -221,11 +209,7 @@ static void ssa_send_to_ssd(pi_mac_entry_t *data)
     nt_msg = (msg_info_t *)ss_info->payload;
     nt_msg->msg_len = msg_len;
     memcpy(nt_msg->msg, data, sizeof(pi_mac_entry_t));
-    /* 发送消息 */
-    rv = ss_msg_send(ss_info);
-    if (rv != 0) {
-        printf("ss_msg_send is failed \n");
-    }
+    ss_msg_send(ss_info);
     /* 释放消息内容 */
     ss_info_free(ss_info);
 }

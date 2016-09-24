@@ -27,7 +27,6 @@ static mac_opra_class_t g_ssd_mac_opera;
 static void ssd_send_msg_ssc(msg_info_t *msg_info)
 {
     ss_info_t *ss_info;
-    int rv;
     
     ss_info = ss_info_alloc_init(msg_info->msg_len);
     if (ss_info == NULL) {
@@ -43,10 +42,7 @@ static void ssd_send_msg_ssc(msg_info_t *msg_info)
     ss_info->hdr.dst_type   = SS_MSG_DST_SELF_NODE;
     memcpy(ss_info->payload, (char *)msg_info, msg_info->msg_len);
     /* 发送消息 */
-    rv = ss_msg_send(ss_info);
-    if (rv != 0) {
-        printf("rv: %d", rv);
-    }
+    ss_msg_send(ss_info);
     /* 释放消息内容 */
     ss_info_free(ss_info);
     
@@ -76,7 +72,6 @@ void ssd_send_ssa_conf(int unit, int msgid, int msg_len, void *msg)
 {
     msg_info_t *reve_info;  
     ss_info_t *ss_info;
-    int rv;
 
     ss_info = ss_info_alloc_init(msg_len);
     if (ss_info == NULL) {
@@ -98,10 +93,7 @@ void ssd_send_ssa_conf(int unit, int msgid, int msg_len, void *msg)
         memcpy(reve_info, msg, msg_len);
     }
     /* 发送消息 */
-    rv = ss_msg_send(ss_info);
-    if (rv != 0) {
-        PRINT_DUG("rv: %d", rv);
-    }
+    ss_msg_send(ss_info);
     /* 释放消息内容 */
     ss_info_free(ss_info);
 }
